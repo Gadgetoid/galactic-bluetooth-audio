@@ -18,6 +18,7 @@ add_executable(${NAME}
     ${CMAKE_CURRENT_LIST_DIR}/picow_bt_example_background.cpp  # int main()
     ${CMAKE_CURRENT_LIST_DIR}/a2dp_sink_demo.cpp
     ${CMAKE_CURRENT_LIST_DIR}/btstack_audio_pico.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/fixed_fft.cpp
 )
 
 target_link_libraries(${NAME}

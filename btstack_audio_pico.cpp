@@ -57,11 +57,13 @@
 #include "pico/stdlib.h"
 
 #include "galactic_unicorn.hpp"
+#include "fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS          5
 #define SAMPLES_PER_BUFFER 512
 
 pimoroni::GalacticUnicorn galactic;
+FIX_FFT fft;
 
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
@@ -135,6 +137,26 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             for (i = SAMPLES_PER_BUFFER - 1 ; i >= 0; i--){
                 buffer16[2*i  ] = buffer16[i];
                 buffer16[2*i+1] = buffer16[i];
+            }
+        }
+
+        for (auto i = 0u; i < SAMPLES_PER_BUFFER; i++) {
+            fft.sample_array[i] = buffer16[i];
+        }
+        fft.update();
+        for (auto i = 0u; i < galactic.WIDTH; i++) {
+            uint16_t sample = std::min((int16_t)2800, (int16_t)fft.get_scaled(i + 2, 1));
+            sample = std::max((uint16_t)0, sample);
+            for (auto y = 0; y < 11; y++) {
+                uint8_t r = std::min((uint16_t)255, sample);
+                uint8_t b = r;
+                galactic.set_pixel(i, galactic.HEIGHT - 1 - y, r, 0, b >> 4);
+
+                if(sample >= 255) {
+                    sample -= 255;
+                } else {
+                    sample = 0;
+                }
             }
         }
 
