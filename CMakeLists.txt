@@ -34,3 +34,14 @@ target_compile_definitions(${NAME} PRIVATE
 
 pico_enable_stdio_usb(${NAME} 1)
 pico_add_extra_outputs(${NAME})
+
+# Set up files for the release packages
+install(FILES
+    ${CMAKE_CURRENT_BINARY_DIR}/${NAME}.uf2
+    ${CMAKE_CURRENT_LIST_DIR}/README.md
+    DESTINATION .
+)
+
+set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY OFF)
+set(CPACK_GENERATOR "ZIP" "TGZ")
+include(CPack)
