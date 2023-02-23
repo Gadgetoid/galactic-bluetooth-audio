@@ -60,7 +60,6 @@
 #include "fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS          5
-#define SAMPLES_PER_BUFFER 512
 
 pimoroni::GalacticUnicorn galactic;
 FIX_FFT fft;
@@ -94,7 +93,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     btstack_audio_pico_producer_format.format = &btstack_audio_pico_audio_format;
     btstack_audio_pico_producer_format.sample_stride = 2 * 2;
 
-    audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLES_PER_BUFFER); // todo correct size
+    audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLE_COUNT); // todo correct size
 
     audio_i2s_config_t config;
     config.data_pin       = PICO_AUDIO_I2S_DATA_PIN;
@@ -134,15 +133,20 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         // duplicate samples for mono
         if (btstack_audio_pico_channel_count == 1){
             int16_t i;
-            for (i = SAMPLES_PER_BUFFER - 1 ; i >= 0; i--){
+            for (i = SAMPLE_COUNT - 1 ; i >= 0; i--){
                 buffer16[2*i  ] = buffer16[i];
                 buffer16[2*i+1] = buffer16[i];
             }
         }
 
-        for (auto i = 0u; i < SAMPLES_PER_BUFFER; i++) {
+        for (auto i = 0u; i < SAMPLE_COUNT; i++) {
             fft.sample_array[i] = buffer16[i];
+            buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
         }
+        for (auto i = SAMPLE_COUNT; i < 2 * SAMPLE_COUNT; ++i) {
+            buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
+        }
+
         fft.update();
         for (auto i = 0u; i < galactic.WIDTH; i++) {
             uint16_t sample = std::min((int16_t)2800, (int16_t)fft.get_scaled(i + 2, 1));
@@ -193,8 +197,8 @@ static int btstack_audio_pico_sink_init(
 }
 
 static void btstack_audio_pico_sink_set_volume(uint8_t volume){
-    galactic.set_pixel(0, 1, volume, 0, 0);
-    //UNUSED(volume);
+    //galactic.set_pixel(0, 1, volume, 0, 0);
+    btstack_volume = volume;
 }
 
 static void btstack_audio_pico_sink_start_stream(void){
