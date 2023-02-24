@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 
-set(NAME bluetooth-boilerplate)
+set(NAME blunicorn)
 
 include(pico_sdk_import.cmake)
 include(pico_extras_import.cmake)
