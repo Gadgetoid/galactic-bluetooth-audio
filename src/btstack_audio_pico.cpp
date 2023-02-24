@@ -60,6 +60,7 @@
 #include "fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS 5
+#define FFT_SKIP_BINS 8 // Number of FFT bins to skip on the left, the low frequencies tend to be pretty boring visually
 
 constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
 constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
@@ -196,7 +197,7 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         fft.update();
         float scale = float(display.HEIGHT) * .318;
         for (auto i = 0u; i < display.WIDTH; i++) {
-            uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(scale)));
+            uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + FFT_SKIP_BINS, float_to_fix15(scale)));
             uint8_t maxy = 0;
             int maxj = -1;
 
