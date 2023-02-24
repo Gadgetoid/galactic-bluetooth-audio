@@ -59,8 +59,7 @@
 #include "display.hpp"
 #include "fixed_fft.hpp"
 
-#define DRIVER_POLL_INTERVAL_MS          5
-#define SAMPLES_PER_BUFFER 512
+#define DRIVER_POLL_INTERVAL_MS 5
 
 struct RGB {
     int8_t r, g, b;
@@ -123,7 +122,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     btstack_audio_pico_producer_format.format = &btstack_audio_pico_audio_format;
     btstack_audio_pico_producer_format.sample_stride = 2 * 2;
 
-    audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLES_PER_BUFFER); // todo correct size
+    audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLE_COUNT); // todo correct size
 
     audio_i2s_config_t config;
     config.data_pin       = PICO_AUDIO_I2S_DATA_PIN;
@@ -169,13 +168,13 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         // duplicate samples for mono
         if (btstack_audio_pico_channel_count == 1){
             int16_t i;
-            for (i = SAMPLES_PER_BUFFER - 1 ; i >= 0; i--){
+            for (i = SAMPLE_COUNT - 1 ; i >= 0; i--){
                 buffer16[2*i  ] = buffer16[i];
                 buffer16[2*i+1] = buffer16[i];
             }
         }
 
-        for (auto i = 0u; i < SAMPLES_PER_BUFFER; i++) {
+        for (auto i = 0u; i < SAMPLE_COUNT; i++) {
             fft.sample_array[i] = buffer16[i];
         }
         fft.update();
