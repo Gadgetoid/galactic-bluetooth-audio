@@ -252,8 +252,9 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             }
         }
 
-        constexpr float max_sample_from_fft = 3200.f;
-        constexpr fix15 multiple = float_to_fix15(pow(max_sample_from_fft / 255, -1.f / (display.HEIGHT - 1)));
+        constexpr float max_sample_from_fft = 3200.f; // Maybe 3500 on Cosmic
+        constexpr int lower_threshold = 255;          // Maybe 200 on Cosmic
+        constexpr fix15 multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.HEIGHT - 1)));
         fft.update();
         for (auto i = 0u; i < display.WIDTH; i++) {
             fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
@@ -269,7 +270,7 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 uint8_t r = 0;
                 uint8_t g = 0;
                 uint8_t b = 0;
-                if (sample > int_to_fix15(255)) {
+                if (sample > int_to_fix15(lower_threshold)) {
                     r = (uint16_t)(palette_main[i].r);
                     g = (uint16_t)(palette_main[i].g);
                     b = (uint16_t)(palette_main[i].b);
