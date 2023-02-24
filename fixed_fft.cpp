@@ -24,6 +24,10 @@ int FIX_FFT::get_scaled(unsigned int i, unsigned int scale) {
     return fix15_to_int(multiply_fix15(fr[i], int_to_fix15(scale)));
 }
 
+int FIX_FFT::get_scaled_fix15(unsigned int i, fix15 scale) {
+    return fix15_to_int(multiply_fix15(fr[i], scale));
+}
+
 void FIX_FFT::init() {
 
     // Populate Filter and Sine tables
@@ -71,6 +75,13 @@ float FIX_FFT::max_frequency() {
     return max_freq_dex * (sample_rate / SAMPLE_COUNT);
 }
 
+// abs(a) must be <= 1
+constexpr __always_inline fix15 multiply_fix15_unit(fix15 a, fix15 b) {
+    int32_t bh = b >> 15;
+    int32_t bl = b & 0x7fff;
+    return ((a * bl) >> 15) + (a * bh);;
+}
+
 void FIX_FFT::FFT() {
     // Bit Reversal Permutation
     // Bit reversal code below originally based on that found here: 
@@ -114,8 +125,8 @@ void FIX_FFT::FFT() {
                 // j gets the index of the FFT element being combined with i
                 int j = i + L;
                 // compute the trig terms (bottom half of the above matrix)
-                fix15 tr = multiply_fix15(wr, fr[j]) - multiply_fix15(wi, fi[j]);
-                fix15 ti = multiply_fix15(wr, fi[j]) + multiply_fix15(wi, fr[j]);
+                fix15 tr = multiply_fix15_unit(wr, fr[j]) - multiply_fix15_unit(wi, fi[j]);
+                fix15 ti = multiply_fix15_unit(wr, fi[j]) + multiply_fix15_unit(wi, fr[j]);
                 // divide ith index elements by two (top half of above matrix)
                 fix15 qr = fr[i] >> 1;
                 fix15 qi = fi[i] >> 1;
