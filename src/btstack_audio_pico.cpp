@@ -62,8 +62,37 @@
 #define DRIVER_POLL_INTERVAL_MS          5
 #define SAMPLES_PER_BUFFER 512
 
+struct RGB {
+    int8_t r, g, b;
+
+    constexpr RGB() : r(0), g(0), b(0) {}
+    constexpr RGB(uint c) : r((c >> 16) & 0xff), g((c >> 8) & 0xff), b(c & 0xff) {}
+    constexpr RGB(int8_t r, int8_t g, int8_t b) : r(r), g(g), b(b) {}
+
+    static RGB from_hsv(float h, float s, float v) {
+        float i = floor(h * 6.0f);
+        float f = h * 6.0f - i;
+        v *= 255.0f;
+        uint8_t p = v * (1.0f - s);
+        uint8_t q = v * (1.0f - f * s);
+        uint8_t t = v * (1.0f - (1.0f - f) * s);
+
+        switch (int(i) % 6) {
+        case 0: return RGB(v, t, p);
+        case 1: return RGB(q, v, p);
+        case 2: return RGB(p, v, t);
+        case 3: return RGB(p, q, v);
+        case 4: return RGB(t, p, v);
+        case 5: return RGB(v, p, q);
+        default: return RGB(0, 0, 0);
+        }
+    }
+};
+
 Display display;
 FIX_FFT fft;
+
+RGB *palette;
 
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
@@ -118,6 +147,12 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     display.clear();
     display.set_pixel(0, 0, 255, 0, 0);
 
+    palette = new RGB[display.WIDTH];
+    for(auto i = 0u; i < display.WIDTH; i++) {
+        float h = float(i) / display.WIDTH;
+        palette[i] = RGB::from_hsv(h, 1.0f, 1.0f);
+    }
+
     return producer_pool;
 }
 
@@ -148,9 +183,11 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         for (auto i = 0u; i < display.WIDTH; i++) {
             uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(scale)));
             for (auto y = 0; y < display.HEIGHT; y++) {
-                uint8_t r = std::min((uint16_t)255, sample);
-                uint8_t b = r;
-                display.set_pixel(i, display.HEIGHT - 1 - y, r, 0, b >> 4);
+
+                uint8_t r = std::min((uint16_t)(palette[i].r), sample);
+                uint8_t g = std::min((uint16_t)(palette[i].g), sample);
+                uint8_t b = std::min((uint16_t)(palette[i].b), sample);
+                display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
 
                 if(sample >= 255) {
                     sample -= 255;
