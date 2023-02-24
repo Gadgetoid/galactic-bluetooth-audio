@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 include(bluetooth/bluetooth.cmake)
-include(galactic/galactic_unicorn.cmake)
+include(display/galactic/galactic_unicorn.cmake)
 
 add_executable(${NAME}
     ${CMAKE_CURRENT_LIST_DIR}/src/main.cpp
