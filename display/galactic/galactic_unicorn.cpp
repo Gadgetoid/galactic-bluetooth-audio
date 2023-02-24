@@ -47,6 +47,8 @@ PIO Display::bitstream_pio = pio0;
 uint Display::bitstream_sm = 0;
 uint Display::bitstream_sm_offset = 0;
 
+static uint16_t gamma_lut[256] = {0};
+
 Display::~Display() {
   dma_channel_unclaim(dma_ctrl_channel); // This works now the teardown behaves correctly
   dma_channel_unclaim(dma_channel); // This works now the teardown behaves correctly
@@ -60,6 +62,14 @@ uint16_t Display::light() {
 }
 
 void Display::init() {
+  float gamma = 1.8f;
+  // create 14-bit gamma luts
+  for(uint16_t v = 0; v < 256; v++) {
+    // gamma correct the provided 0-255 brightness value onto a
+    // 0-65535 range for the pwm counter
+    gamma_lut[v] = (uint16_t)(powf((float)(v) / 255.0f, gamma) * (float(1U << (BCD_FRAME_COUNT)) - 1.0f) + 0.5f);
+  }
+
   // for each row:
   //   for each bcd frame:
   //            0: 00110110                           // row pixel count (minus one)
@@ -278,9 +288,9 @@ void Display::set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
   g = (g * this->brightness) >> 8;
   b = (b * this->brightness) >> 8;
 
-  uint16_t gamma_r = r << 6;
-  uint16_t gamma_g = g << 6;
-  uint16_t gamma_b = b << 6;
+  uint16_t gamma_r = gamma_lut[r];
+  uint16_t gamma_g = gamma_lut[g];
+  uint16_t gamma_b = gamma_lut[b];
 
   // for each row:
   //   for each bcd frame:
