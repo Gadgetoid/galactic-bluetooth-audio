@@ -66,11 +66,11 @@ constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
 constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
 
 struct RGB {
-    int8_t r, g, b;
+    uint8_t r, g, b;
 
     constexpr RGB() : r(0), g(0), b(0) {}
     constexpr RGB(uint c) : r((c >> 16) & 0xff), g((c >> 8) & 0xff), b(c & 0xff) {}
-    constexpr RGB(int8_t r, int8_t g, int8_t b) : r(r), g(g), b(b) {}
+    constexpr RGB(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
 
     static RGB from_hsv(float h, float s, float v) {
         int i = h * 6.0f;
@@ -81,6 +81,7 @@ struct RGB {
         uint8_t t = v * (1.0f - ((1.0f - f) * s));
 
         switch (i % 6) {
+        default:
         case 0: return RGB(v, t, p);
         case 1: return RGB(q, v, p);
         case 2: return RGB(p, v, t);
@@ -160,8 +161,8 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 
     for(auto i = 0u; i < display.WIDTH; i++) {
         float h = float(i) / display.WIDTH;
-        palette_peak[i] = RGB::from_hsv(h, 0.9f, 1.0f);
-        palette_main[i] = RGB::from_hsv(h, 1.0f, 0.5f);
+        palette_peak[i] = RGB::from_hsv(h, 0.7f, 1.0f);
+        palette_main[i] = RGB::from_hsv(h, 1.0f, 0.7f);
     }
 
     return producer_pool;
