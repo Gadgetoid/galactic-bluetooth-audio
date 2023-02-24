@@ -72,6 +72,11 @@
 
 //#define AVRCP_BROWSING_ENABLED
 
+
+#ifndef BLUETOOTH_DEVICE_NAME
+#define BLUETOOTH_DEVICE_NAME "PicoW 00:00:00:00:00:00"
+#endif
+
 #ifdef HAVE_BTSTACK_STDIN
 #include "btstack_stdin.h"
 #endif
@@ -81,11 +86,6 @@
 #endif
 
 #include "btstack_ring_buffer.h"
-
-#ifdef HAVE_POSIX_FILE_IO
-#include "wav_util.h"
-#define STORE_TO_WAV_FILE
-#endif
 
 #define NUM_CHANNELS 2
 #define BYTES_PER_FRAME     (2*NUM_CHANNELS)
@@ -109,12 +109,6 @@ static uint8_t media_sbc_codec_capabilities[] = {
     0xFF,//(AVDTP_SBC_BLOCK_LENGTH_16 << 4) | (AVDTP_SBC_SUBBANDS_8 << 2) | AVDTP_SBC_ALLOCATION_METHOD_LOUDNESS,
     2, 53
 };
-
-// WAV File
-#ifdef STORE_TO_WAV_FILE
-static uint32_t audio_frame_count = 0;
-static char * wav_filename = "a2dp_sink_demo.wav";
-#endif
 
 // SBC Decoder for WAV file or live playback
 static btstack_sbc_decoder_state_t state;
@@ -289,7 +283,7 @@ static int a2dp_and_avrcp_setup(void){
     // Set local name with a template Bluetooth address, that will be automatically
     // replaced with an actual address once it is available, i.e. when BTstack boots
     // up and starts talking to a Bluetooth module.
-    gap_set_local_name("A2DP Sink Demo 00:00:00:00:00:00");
+    gap_set_local_name(BLUETOOTH_DEVICE_NAME);
 
     // allot to show up in Bluetooth inquiry
     gap_discoverable_control(1);
@@ -313,9 +307,6 @@ static int a2dp_and_avrcp_setup(void){
     } else {
         printf("Audio playback supported.\n");
     }
-#ifdef STORE_TO_WAV_FILE 
-   printf("Audio will be stored to \'%s\' file.\n",  wav_filename);
-#endif
 #endif
     return 0;
 }
@@ -325,11 +316,6 @@ btstack_sample_rate_compensation_t sample_rate_compensation;
 #endif
 
 static void playback_handler(int16_t * buffer, uint16_t num_audio_frames){
-
-#ifdef STORE_TO_WAV_FILE
-    int       wav_samples = num_audio_frames * NUM_CHANNELS;
-    int16_t * wav_buffer  = buffer;
-#endif
     
     // called from lower-layer but guaranteed to be on main thread
     if (sbc_frame_size == 0){
@@ -352,11 +338,6 @@ static void playback_handler(int16_t * buffer, uint16_t num_audio_frames){
         btstack_ring_buffer_read(&sbc_frame_ring_buffer, sbc_frame, sbc_frame_size, &bytes_read);
         btstack_sbc_decoder_process_data(&state, 0, sbc_frame, sbc_frame_size);
     }
-
-#ifdef STORE_TO_WAV_FILE
-    audio_frame_count += num_audio_frames;
-    wav_writer_write_int16(wav_samples, wav_buffer);
-#endif
 }
 
 static void handle_pcm_data(int16_t * data, int num_audio_frames, int num_channels, int sample_rate, void * context){
@@ -366,10 +347,6 @@ static void handle_pcm_data(int16_t * data, int num_audio_frames, int num_channe
 
     const btstack_audio_sink_t * audio_sink = btstack_audio_sink_get_instance();
     if (!audio_sink){
-#ifdef STORE_TO_WAV_FILE
-        audio_frame_count += num_audio_frames;
-        wav_writer_write_int16(num_audio_frames * NUM_CHANNELS, data);
-#endif
         return;
     }
 
@@ -399,10 +376,6 @@ static int media_processing_init(media_codec_configuration_sbc_t * configuration
     btstack_sample_rate_compensation_init( &sample_rate_compensation, btstack_run_loop_get_time_ms(), configuration->sampling_frequency, FLOAT_TO_Q15(1.f) );
 #endif
     btstack_sbc_decoder_init(&state, mode, handle_pcm_data, NULL);
-
-#ifdef STORE_TO_WAV_FILE
-    wav_writer_open(wav_filename, configuration->num_channels, configuration->sampling_frequency);
-#endif
 
     btstack_ring_buffer_init(&sbc_frame_ring_buffer, sbc_frame_storage, sizeof(sbc_frame_storage));
     btstack_ring_buffer_init(&decoded_audio_ring_buffer, decoded_audio_storage, sizeof(decoded_audio_storage));
@@ -450,14 +423,6 @@ static void media_processing_close(void){
     media_initialized = 0;
     audio_stream_started = 0;
     sbc_frame_size = 0;
-
-#ifdef STORE_TO_WAV_FILE                 
-    wav_writer_close();
-    uint32_t total_frames_nr = state.good_frames_nr + state.bad_frames_nr + state.zero_frames_nr;
-
-    printf("WAV Writer: Decoding done. Processed %u SBC frames:\n - %d good\n - %d bad\n", total_frames_nr, state.good_frames_nr, total_frames_nr - state.good_frames_nr);
-    printf("WAV Writer: Wrote %u audio frames to wav file: %s\n", audio_frame_count, wav_filename);
-#endif
 
     // stop audio playback
     const btstack_audio_sink_t * audio = btstack_audio_sink_get_instance();
