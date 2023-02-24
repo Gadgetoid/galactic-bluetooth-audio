@@ -144,9 +144,10 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             fft.sample_array[i] = buffer16[i];
         }
         fft.update();
+        float scale = float(display.HEIGHT) * .318;
         for (auto i = 0u; i < display.WIDTH; i++) {
-            uint16_t sample = std::min((int16_t)2800, (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(3.5)));
-            for (auto y = 0; y < 11; y++) {
+            uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(scale)));
+            for (auto y = 0; y < display.HEIGHT; y++) {
                 uint8_t r = std::min((uint16_t)255, sample);
                 uint8_t b = r;
                 display.set_pixel(i, display.HEIGHT - 1 - y, r, 0, b >> 4);
