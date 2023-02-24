@@ -61,6 +61,9 @@
 
 #define DRIVER_POLL_INTERVAL_MS 5
 
+constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
+constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
+
 struct RGB {
     int8_t r, g, b;
 
@@ -69,29 +72,33 @@ struct RGB {
     constexpr RGB(int8_t r, int8_t g, int8_t b) : r(r), g(g), b(b) {}
 
     static RGB from_hsv(float h, float s, float v) {
-        float i = floor(h * 6.0f);
-        float f = h * 6.0f - i;
+        int i = h * 6.0f;
+        float f = (h * 6.0f) - i;
         v *= 255.0f;
         uint8_t p = v * (1.0f - s);
-        uint8_t q = v * (1.0f - f * s);
-        uint8_t t = v * (1.0f - (1.0f - f) * s);
+        uint8_t q = v * (1.0f - (f * s));
+        uint8_t t = v * (1.0f - ((1.0f - f) * s));
 
-        switch (int(i) % 6) {
+        switch (i % 6) {
         case 0: return RGB(v, t, p);
         case 1: return RGB(q, v, p);
         case 2: return RGB(p, v, t);
         case 3: return RGB(p, q, v);
         case 4: return RGB(t, p, v);
         case 5: return RGB(v, p, q);
-        default: return RGB(0, 0, 0);
         }
     }
 };
 
 Display display;
+constexpr int HISTORY_LEN = 8;
+static uint history_idx = 0;
+static uint8_t eq_history[display.WIDTH][HISTORY_LEN] = {{0}};
+
 FIX_FFT fft;
 
-RGB *palette;
+RGB palette_peak[display.WIDTH];
+RGB palette_main[display.WIDTH];
 
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
@@ -108,6 +115,8 @@ static audio_format_t        btstack_audio_pico_audio_format;
 static audio_buffer_format_t btstack_audio_pico_producer_format;
 static audio_buffer_pool_t * btstack_audio_pico_audio_buffer_pool;
 static uint8_t               btstack_audio_pico_channel_count;
+static uint8_t               btstack_volume;
+static uint8_t               btstack_last_sample_idx;
 
 static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channel_count) {
 
@@ -122,7 +131,9 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     btstack_audio_pico_producer_format.format = &btstack_audio_pico_audio_format;
     btstack_audio_pico_producer_format.sample_stride = 2 * 2;
 
-    audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLE_COUNT); // todo correct size
+    btstack_last_sample_idx = 0;
+
+    audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLES_PER_AUDIO_BUFFER); // todo correct size
 
     audio_i2s_config_t config;
     config.data_pin       = PICO_AUDIO_I2S_DATA_PIN;
@@ -146,10 +157,10 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     display.clear();
     display.set_pixel(0, 0, 255, 0, 0);
 
-    palette = new RGB[display.WIDTH];
     for(auto i = 0u; i < display.WIDTH; i++) {
         float h = float(i) / display.WIDTH;
-        palette[i] = RGB::from_hsv(h, 1.0f, 1.0f);
+        palette_peak[i] = RGB::from_hsv(h, 0.9f, 1.0f);
+        palette_main[i] = RGB::from_hsv(h, 1.0f, 0.5f);
     }
 
     return producer_pool;
@@ -174,27 +185,49 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             }
         }
 
+        int16_t* fft_array = &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER * btstack_last_sample_idx];
+        btstack_last_sample_idx = (btstack_last_sample_idx + 1) % BUFFERS_PER_FFT_SAMPLE;
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
-            fft.sample_array[i] = buffer16[i];
+            fft_array[i] = buffer16[i];
         }
+
         fft.update();
         float scale = float(display.HEIGHT) * .318;
         for (auto i = 0u; i < display.WIDTH; i++) {
             uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(scale)));
             for (auto y = 0; y < display.HEIGHT; y++) {
-
-                uint8_t r = std::min((uint16_t)(palette[i].r), sample);
-                uint8_t g = std::min((uint16_t)(palette[i].g), sample);
-                uint8_t b = std::min((uint16_t)(palette[i].b), sample);
-                display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
-
-                if(sample >= 255) {
+                uint8_t r = 0;
+                uint8_t g = 0;
+                uint8_t b = 0;
+                if (sample > 255) {
+                    r = (uint16_t)(palette_main[i].r);
+                    g = (uint16_t)(palette_main[i].g);
+                    b = (uint16_t)(palette_main[i].b);
                     sample -= 255;
-                } else {
+                }
+                else if (sample > 0) {
+                    r = std::min((uint16_t)(palette_main[i].r), sample);
+                    g = std::min((uint16_t)(palette_main[i].g), sample);
+                    b = std::min((uint16_t)(palette_main[i].b), sample);
+                    eq_history[i][history_idx] = y;
                     sample = 0;
                 }
+                display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
+            }
+            uint8_t maxy = 0;
+            int maxj = -1;
+            for (int j = 0; j < HISTORY_LEN; ++j) {
+                if (eq_history[i][j] > maxy) {
+                    maxy = eq_history[i][j];
+                    maxj = j;
+                }
+            }
+            if (maxj != history_idx && maxy > 0) {
+                RGB c = palette_peak[i];
+                display.set_pixel(i, display.HEIGHT - 1 - maxy, c.r, c.g, c.b);
             }
         }
+        history_idx = (history_idx + 1) % HISTORY_LEN;
 
         audio_buffer->sample_count = audio_buffer->max_sample_count;
         give_audio_buffer(btstack_audio_pico_audio_buffer_pool, audio_buffer);

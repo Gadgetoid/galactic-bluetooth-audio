@@ -14,7 +14,7 @@ constexpr __always_inline float fix15_to_float(fix15 a) {return (float)(a) / 327
 constexpr __always_inline fix15 int_to_fix15(int a) {return (fix15)(a << 15);}
 constexpr __always_inline int fix15_to_int(fix15 a) {return (int)(a >> 15);}
 
-constexpr unsigned int SAMPLE_COUNT = 512u;
+constexpr unsigned int SAMPLE_COUNT = 2048u;
 
 class FIX_FFT {
     private:
