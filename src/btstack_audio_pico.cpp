@@ -91,7 +91,7 @@ struct RGB {
 };
 
 Display display;
-constexpr int HISTORY_LEN = 8;
+constexpr int HISTORY_LEN = 21; // About 0.25s
 static uint history_idx = 0;
 static uint8_t eq_history[display.WIDTH][HISTORY_LEN] = {{0}};
 
@@ -176,8 +176,8 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
-        int16_t* fft_array = &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER * btstack_last_sample_idx];
-        btstack_last_sample_idx = (btstack_last_sample_idx + 1) % BUFFERS_PER_FFT_SAMPLE;
+        int16_t* fft_array = &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER * (BUFFERS_PER_FFT_SAMPLE - 1)];
+        memmove(fft.sample_array, &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER], (BUFFERS_PER_FFT_SAMPLE - 1) * sizeof(uint16_t));
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
             fft_array[i] = buffer16[i];
             // Apply volume after copying to FFT
@@ -197,6 +197,16 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         float scale = float(display.HEIGHT) * .318;
         for (auto i = 0u; i < display.WIDTH; i++) {
             uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(scale)));
+            uint8_t maxy = 0;
+            int maxj = -1;
+
+            for (int j = 0; j < HISTORY_LEN; ++j) {
+                if (eq_history[i][j] > maxy) {
+                    maxy = eq_history[i][j];
+                    maxj = j;
+                }
+            }
+
             for (auto y = 0; y < display.HEIGHT; y++) {
                 uint8_t r = 0;
                 uint8_t g = 0;
@@ -213,16 +223,12 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                     b = std::min((uint16_t)(palette_main[i].b), sample);
                     eq_history[i][history_idx] = y;
                     sample = 0;
+                } else if (y < maxy) {
+                    r = (uint16_t)(palette_main[i].r) >> 2;
+                    g = (uint16_t)(palette_main[i].g) >> 2;
+                    b = (uint16_t)(palette_main[i].b) >> 2;
                 }
                 display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
-            }
-            uint8_t maxy = 0;
-            int maxj = -1;
-            for (int j = 0; j < HISTORY_LEN; ++j) {
-                if (eq_history[i][j] > maxy) {
-                    maxy = eq_history[i][j];
-                    maxj = j;
-                }
             }
             if (maxj != history_idx && maxy > 0) {
                 RGB c = palette_peak[i];
