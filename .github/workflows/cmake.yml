@@ -19,15 +19,16 @@ jobs:
           - os: ubuntu-20.04
             name: Linux
             cache-key: linux
-            cmake-args: '-DPICO_EXTRAS_PATH=$GITHUB_WORKSPACE/pico-extras -DPICO_SDK_PATH=$GITHUB_WORKSPACE/pico-sdk -DPICO_BOARD=pico_w -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/install'
-            apt-packages: clang-tidy gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
+            cmake-args: '-DPICO_EXTRAS_PATH=$GITHUB_WORKSPACE/pico-extras -DPICO_SDK_PATH=$GITHUB_WORKSPACE/pico-sdk -DPICO_BOARD=pico_w -DCMAKE_INSTALL_PREFIX=`pwd`/install'
+            apt-packages: gcc-arm-none-eabi libnewlib-arm-none-eabi libstdc++-arm-none-eabi-newlib
 
     runs-on: ${{matrix.os}}
 
     env:
       PICO_SDK_PATH: $GITHUB_WORKSPACE/pico-sdk
       PIMORONI_PICO_LIBS: $GITHUB_WORKSPACE/pimoroni-pico
-      RELEASE_FILE: ${{github.event.repository.name}}-${{github.event.release.tag_name}}
+      RELEASE_FILE: ${{github.event.repository.name}}-${{github.event.release.tag_name || github.sha}}
+      RELEASE_PATH: $GITHUB_WORKSPACE/install
 
     steps:
     - name: Checkout Code
@@ -70,6 +71,20 @@ jobs:
       shell: bash
       run: |
         cmake --build . --config $BUILD_TYPE -j 2
+
+    - name: Prepare Artifact
+      if: github.event_name != 'release'
+      working-directory: ${{runner.workspace}}/build
+      shell: bash
+      run: |
+        cmake --build . --config $BUILD_TYPE --target install -j 2
+
+    - name: Upload Artifact
+      if: github.event_name != 'release'
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{env.RELEASE_FILE}}
+        path: ${{runner.workspace}}/build/install
 
     - name: Build Release Packages
       if: github.event_name == 'release'
