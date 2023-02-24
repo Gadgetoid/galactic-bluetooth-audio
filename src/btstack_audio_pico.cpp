@@ -176,6 +176,14 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
+        int16_t* fft_array = &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER * btstack_last_sample_idx];
+        btstack_last_sample_idx = (btstack_last_sample_idx + 1) % BUFFERS_PER_FFT_SAMPLE;
+        for (auto i = 0u; i < SAMPLE_COUNT; i++) {
+            fft_array[i] = buffer16[i];
+            // Apply volume after copying to FFT
+            buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
+        }
+
         // duplicate samples for mono
         if (btstack_audio_pico_channel_count == 1){
             int16_t i;
@@ -183,12 +191,6 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 buffer16[2*i  ] = buffer16[i];
                 buffer16[2*i+1] = buffer16[i];
             }
-        }
-
-        int16_t* fft_array = &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER * btstack_last_sample_idx];
-        btstack_last_sample_idx = (btstack_last_sample_idx + 1) % BUFFERS_PER_FFT_SAMPLE;
-        for (auto i = 0u; i < SAMPLE_COUNT; i++) {
-            fft_array[i] = buffer16[i];
         }
 
         fft.update();
@@ -262,8 +264,7 @@ static int btstack_audio_pico_sink_init(
 }
 
 static void btstack_audio_pico_sink_set_volume(uint8_t volume){
-    display.set_pixel(0, 1, volume, 0, 0);
-    //UNUSED(volume);
+    btstack_volume = volume;
 }
 
 static void btstack_audio_pico_sink_start_stream(void){
