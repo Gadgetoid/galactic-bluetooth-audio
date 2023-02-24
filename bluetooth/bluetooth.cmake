@@ -7,7 +7,7 @@ set(BTSTACK_CONFIG_PATH ${CMAKE_CURRENT_LIST_DIR}/config)
 add_library(picow_bt_example_common INTERFACE)
 
 target_sources(picow_bt_example_common INTERFACE
-    ${CMAKE_CURRENT_LIST_DIR}/picow_bt_example_common.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/common.cpp
     ${PICO_BTSTACK_PATH}/src/btstack_audio.c
 )
 

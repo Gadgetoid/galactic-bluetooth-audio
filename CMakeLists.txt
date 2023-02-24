@@ -11,14 +11,18 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
-include(pico_bt_example_common.cmake)
+include(bluetooth/bluetooth.cmake)
 include(galactic/galactic_unicorn.cmake)
 
 add_executable(${NAME}
-    ${CMAKE_CURRENT_LIST_DIR}/picow_bt_example_background.cpp  # int main()
-    ${CMAKE_CURRENT_LIST_DIR}/a2dp_sink_demo.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/btstack_audio_pico.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/fixed_fft.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/main.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/a2dp_sink.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/btstack_audio_pico.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/fixed_fft.cpp
+)
+
+target_include_directories(${NAME} PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
 )
 
 target_link_libraries(${NAME}

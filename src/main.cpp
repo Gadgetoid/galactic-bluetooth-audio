@@ -6,7 +6,7 @@
 
 #include "btstack_run_loop.h"
 #include "pico/stdlib.h"
-#include "picow_bt_example_common.h"
+#include "bluetooth/common.h"
 
 int main() {
     stdio_init_all();
