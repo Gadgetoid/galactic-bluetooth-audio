@@ -34,6 +34,7 @@ target_link_libraries(${NAME}
 target_compile_definitions(${NAME} PRIVATE
     PICO_AUDIO_I2S_DATA_PIN=9
     PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
+    BLUETOOTH_DEVICE_NAME="Galactic Unicorn"
 )
 
 pico_enable_stdio_usb(${NAME} 1)

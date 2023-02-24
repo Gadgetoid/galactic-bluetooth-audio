@@ -72,6 +72,11 @@
 
 //#define AVRCP_BROWSING_ENABLED
 
+
+#ifndef BLUETOOTH_DEVICE_NAME
+#define BLUETOOTH_DEVICE_NAME "PicoW 00:00:00:00:00:00"
+#endif
+
 #ifdef HAVE_BTSTACK_STDIN
 #include "btstack_stdin.h"
 #endif
@@ -278,7 +283,7 @@ static int a2dp_and_avrcp_setup(void){
     // Set local name with a template Bluetooth address, that will be automatically
     // replaced with an actual address once it is available, i.e. when BTstack boots
     // up and starts talking to a Bluetooth module.
-    gap_set_local_name("A2DP Sink Demo 00:00:00:00:00:00");
+    gap_set_local_name(BLUETOOTH_DEVICE_NAME);
 
     // allot to show up in Bluetooth inquiry
     gap_discoverable_control(1);
