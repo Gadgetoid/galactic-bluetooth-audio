@@ -56,13 +56,13 @@
 #include "pico/audio_i2s.h"
 #include "pico/stdlib.h"
 
-#include "galactic_unicorn.hpp"
+#include "display.hpp"
 #include "fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS          5
 #define SAMPLES_PER_BUFFER 512
 
-pimoroni::GalacticUnicorn galactic;
+Display display;
 FIX_FFT fft;
 
 // client
@@ -114,9 +114,9 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     (void)ok;
 
 
-    galactic.init();
-    galactic.clear();
-    galactic.set_pixel(0, 0, 255, 0, 0);
+    display.init();
+    display.clear();
+    display.set_pixel(0, 0, 255, 0, 0);
 
     return producer_pool;
 }
@@ -144,12 +144,12 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             fft.sample_array[i] = buffer16[i];
         }
         fft.update();
-        for (auto i = 0u; i < galactic.WIDTH; i++) {
+        for (auto i = 0u; i < display.WIDTH; i++) {
             uint16_t sample = std::min((int16_t)2800, (int16_t)fft.get_scaled_fix15(i + 2, float_to_fix15(3.5)));
             for (auto y = 0; y < 11; y++) {
                 uint8_t r = std::min((uint16_t)255, sample);
                 uint8_t b = r;
-                galactic.set_pixel(i, galactic.HEIGHT - 1 - y, r, 0, b >> 4);
+                display.set_pixel(i, display.HEIGHT - 1 - y, r, 0, b >> 4);
 
                 if(sample >= 255) {
                     sample -= 255;
@@ -192,12 +192,12 @@ static int btstack_audio_pico_sink_init(
 }
 
 static void btstack_audio_pico_sink_set_volume(uint8_t volume){
-    galactic.set_pixel(0, 1, volume, 0, 0);
+    display.set_pixel(0, 1, volume, 0, 0);
     //UNUSED(volume);
 }
 
 static void btstack_audio_pico_sink_start_stream(void){
-    galactic.set_pixel(0, 2, 0, 255, 0);
+    display.set_pixel(0, 2, 0, 255, 0);
 
     // pre-fill HAL buffers
     btstack_audio_pico_sink_fill_buffers();
@@ -214,7 +214,7 @@ static void btstack_audio_pico_sink_start_stream(void){
 }
 
 static void btstack_audio_pico_sink_stop_stream(void){
-    galactic.set_pixel(0, 2, 0, 0, 0);
+    display.set_pixel(0, 2, 0, 0, 0);
 
     audio_i2s_set_enabled(false);
 

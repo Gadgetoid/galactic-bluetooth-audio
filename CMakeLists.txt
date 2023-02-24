@@ -12,7 +12,13 @@ set(CMAKE_CXX_STANDARD 17)
 pico_sdk_init()
 
 include(bluetooth/bluetooth.cmake)
+
+if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
+include(${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
+else()
+message(WARNING "Using default display (display/galactic/galactic_unicorn.cmake)...")
 include(display/galactic/galactic_unicorn.cmake)
+endif()
 
 add_executable(${NAME}
     ${CMAKE_CURRENT_LIST_DIR}/src/main.cpp
@@ -28,13 +34,15 @@ target_include_directories(${NAME} PRIVATE
 target_link_libraries(${NAME}
     picow_bt_example_common
     pico_audio_i2s
-    galactic_unicorn
+    display
 )
+
+message(WARNING "Display: ${DISPLAY_NAME}")
 
 target_compile_definitions(${NAME} PRIVATE
     PICO_AUDIO_I2S_DATA_PIN=9
     PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
-    BLUETOOTH_DEVICE_NAME="Galactic Unicorn"
+    BLUETOOTH_DEVICE_NAME="${DISPLAY_NAME}"
 )
 
 pico_enable_stdio_usb(${NAME} 1)

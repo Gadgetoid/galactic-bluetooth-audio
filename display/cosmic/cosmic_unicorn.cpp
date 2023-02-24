@@ -7,7 +7,7 @@
 #include "hardware/clocks.h"
 
 
-#include "galactic_unicorn.pio.h"
+#include "cosmic_unicorn.pio.h"
 
 #include "display.hpp"
 
@@ -30,15 +30,14 @@
 //
 // for each row:
 //   for each bcd frame:
-//            0: 00110110                           // row pixel count (minus one)
-//      1  - 53: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
-//      54 - 55: xxxxxxxx, xxxxxxxx                 // dummy bytes to dword align
-//           56: xxxxrrrr                           // row select bits
-//      57 - 59: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
+//            0: 00111111                           // row pixel count (minus one)
+//      1  - 64: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
+//      65 - 67: xxxxxxxx, xxxxxxxx, xxxxxxxx       // dummy bytes to dword align
+//           68: xxxxrrrr                           // row select bits
+//      69 - 71: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
 //
 //  .. and back to the start
 
-//static uint16_t r_gamma_lut[256] = {0};
 
 static uint32_t dma_channel;
 static uint32_t dma_ctrl_channel;
@@ -51,7 +50,7 @@ Display::~Display() {
   dma_channel_unclaim(dma_ctrl_channel); // This works now the teardown behaves correctly
   dma_channel_unclaim(dma_channel); // This works now the teardown behaves correctly
   pio_sm_unclaim(bitstream_pio, bitstream_sm);
-  pio_remove_program(bitstream_pio, &galactic_unicorn_program, bitstream_sm_offset);
+  pio_remove_program(bitstream_pio, &cosmic_unicorn_program, bitstream_sm_offset);
 }
 
 uint16_t Display::light() {
@@ -62,29 +61,28 @@ uint16_t Display::light() {
 void Display::init() {
   // for each row:
   //   for each bcd frame:
-  //            0: 00110110                           // row pixel count (minus one)
-  //      1  - 53: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
-  //      54 - 55: xxxxxxxx, xxxxxxxx                 // dummy bytes to dword align
-  //           56: xxxxrrrr                           // row select bits
-  //      57 - 59: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
+  //            0: 00111111                           // row pixel count (minus one)
+  //      1  - 64: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
+  //      65 - 67: xxxxxxxx, xxxxxxxx, xxxxxxxx       // dummy bytes to dword align
+  //           68: xxxrrrrr                           // row select bits
+  //      69 - 71: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
   //
   //  .. and back to the start
 
   // initialise the bcd timing values and row selects in the bitstream
-  for(uint8_t row = 0; row < HEIGHT; row++) {
+  for(uint8_t row = 0; row < 16; row++) {
     for(uint8_t frame = 0; frame < BCD_FRAME_COUNT; frame++) {
       // find the offset of this row and frame in the bitstream
       uint8_t *p = &bitstream[row * ROW_BYTES + (BCD_FRAME_BYTES * frame)];
 
-      p[ 0] = WIDTH - 1;               // row pixel count
-      p[ 1] = row;                     // row select
+      p[ 0] = 64 - 1;               // row pixel count
+      p[68] = row;                  // row select
 
       // set the number of bcd ticks for this frame
       uint32_t bcd_ticks = (1 << frame);
-      p[56] = (bcd_ticks &       0xff) >>  0;
-      p[57] = (bcd_ticks &     0xff00) >>  8;
-      p[58] = (bcd_ticks &   0xff0000) >> 16;
-      p[59] = (bcd_ticks & 0xff000000) >> 24;
+      p[69] = (bcd_ticks &     0xff) >>  0;
+      p[70] = (bcd_ticks &   0xff00) >>  8;
+      p[71] = (bcd_ticks & 0xff0000) >> 16;
     }
   }
 
@@ -109,8 +107,8 @@ void Display::init() {
 
   uint16_t reg1 = 0b1111111111001110;
 
-  // clock the register value to the first 9 driver chips
-  for(int j = 0; j < 9; j++) {
+  // clock the register value to the first 11 driver chips
+  for(int j = 0; j < 11; j++) {
     for(int i = 0; i < 16; i++) {
       if(reg1 & (1U << (15 - i))) {
         gpio_put(COLUMN_DATA, true);
@@ -166,9 +164,9 @@ void Display::init() {
   gpio_init(SWITCH_VOLUME_DOWN); gpio_pull_up(SWITCH_VOLUME_DOWN);
 
   // setup the pio if it has not previously been set up
-  bitstream_pio = pio1;
+  bitstream_pio = pio0;
   bitstream_sm = pio_claim_unused_sm(bitstream_pio, true);
-  bitstream_sm_offset = pio_add_program(bitstream_pio, &galactic_unicorn_program);
+  bitstream_sm_offset = pio_add_program(bitstream_pio, &cosmic_unicorn_program);
 
   pio_gpio_init(bitstream_pio, COLUMN_CLOCK);
   pio_gpio_init(bitstream_pio, COLUMN_DATA);
@@ -186,7 +184,7 @@ void Display::init() {
   pio_sm_set_pins_with_mask(bitstream_pio, bitstream_sm, pins_to_set, pins_to_set);
   pio_sm_set_consecutive_pindirs(bitstream_pio, bitstream_sm, COLUMN_CLOCK, 8, true);
 
-  pio_sm_config c = galactic_unicorn_program_get_default_config(bitstream_sm_offset);
+  pio_sm_config c = cosmic_unicorn_program_get_default_config(bitstream_sm_offset);
 
   // osr shifts right, autopull on, autopull threshold 8
   sm_config_set_out_shift(&c, true, true, 32);
@@ -244,9 +242,9 @@ void Display::init() {
 
 void Display::clear() {
   for(uint8_t y = 0; y < HEIGHT; y++) {
-      for(uint8_t x = 0; x < WIDTH; x++) {
-          set_pixel(x, y, 0, 0, 0);
-      }
+    for(uint8_t x = 0; x < WIDTH; x++) {
+      set_pixel(x, y, 0, 0, 0);
+    }
   }
 }
 
@@ -268,11 +266,17 @@ void Display::dma_safe_abort(uint channel) {
 }
 
 void Display::set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-  if(x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) return;
-
-  // make those coordinates sane
   x = (WIDTH - 1) - x;
   y = (HEIGHT - 1) - y;
+
+  // map coordinates into display space
+  if(y < 16) {
+    // move to top half of display (which is actually the right half of the framebuffer)
+    x += 32;
+  }else{
+    // remap y coordinate
+    y -= 16;      
+  }
 
   r = (r * this->brightness) >> 8;
   g = (g * this->brightness) >> 8;
@@ -284,17 +288,17 @@ void Display::set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
 
   // for each row:
   //   for each bcd frame:
-  //            0: 00110110                           // row pixel count (minus one)
-  //      1  - 53: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
-  //      54 - 55: xxxxxxxx, xxxxxxxx                 // dummy bytes to dword align
-  //           56: xxxxrrrr                           // row select bits
-  //      57 - 59: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
+  //            0: 00111111                           // row pixel count (minus one)
+  //      1  - 64: xxxxxbgr, xxxxxbgr, xxxxxbgr, ...  // pixel data
+  //      65 - 67: xxxxxxxx, xxxxxxxx, xxxxxxxx       // dummy bytes to dword align
+  //           68: xxxxrrrr                           // row select bits
+  //      69 - 71: tttttttt, tttttttt, tttttttt       // bcd tick count (0-65536)
   //
   //  .. and back to the start
 
   // set the appropriate bits in the separate bcd frames
   for(uint8_t frame = 0; frame < BCD_FRAME_COUNT; frame++) {
-    uint8_t *p = &bitstream[y * ROW_BYTES + (BCD_FRAME_BYTES * frame) + 2 + x];
+    uint8_t *p = &bitstream[y * ROW_BYTES + (BCD_FRAME_BYTES * frame) + 1 + x];
 
     uint8_t red_bit = gamma_r & 0b1;
     uint8_t green_bit = gamma_g & 0b1;
@@ -322,6 +326,6 @@ void Display::adjust_brightness(float delta) {
   this->set_brightness(this->get_brightness() + delta);
 }
 
-void update() {
+void Display::update() {
   // do something here, probably do the FFT and write the display back buffer?
 }

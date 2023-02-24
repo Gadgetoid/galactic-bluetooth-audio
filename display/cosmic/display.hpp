@@ -2,12 +2,10 @@
 
 #include "hardware/pio.h"
 
-namespace pimoroni {
-
-  class GalacticUnicorn {
+class Display {
   public:
-    static const int WIDTH  = 53;
-    static const int HEIGHT = 11;
+    static const int WIDTH  = 32;
+    static const int HEIGHT = 32;
 
     // pin assignments
     static const uint8_t COLUMN_CLOCK           = 13;
@@ -44,16 +42,16 @@ namespace pimoroni {
     static const uint8_t SWITCH_BRIGHTNESS_DOWN = 26;
 
   private:
-    static const uint32_t ROW_COUNT = 11;
+    static const uint32_t ROW_COUNT = 16;
     static const uint32_t BCD_FRAME_COUNT = 14;
-    static const uint32_t BCD_FRAME_BYTES = 60;
+    static const uint32_t BCD_FRAME_BYTES = 72;
     static const uint32_t ROW_BYTES = BCD_FRAME_COUNT * BCD_FRAME_BYTES;
     static const uint32_t BITSTREAM_LENGTH = (ROW_COUNT * ROW_BYTES);
 
   private:
     static PIO bitstream_pio;
     static uint bitstream_sm;
-    static uint bitstream_sm_offset;
+    static uint bitstream_sm_offset;;
 
     uint16_t brightness = 256;
 
@@ -61,7 +59,7 @@ namespace pimoroni {
     alignas(4) uint8_t bitstream[BITSTREAM_LENGTH] = {0};
     const uint32_t bitstream_addr = (uint32_t)bitstream;
   public:
-    ~GalacticUnicorn();
+    ~Display();
 
     void init();
     static inline void pio_program_init(PIO pio, uint sm, uint offset);
@@ -78,8 +76,8 @@ namespace pimoroni {
 
     uint16_t light();
 
+    bool is_pressed(uint8_t button);
+
   private:
     void dma_safe_abort(uint channel);
-  };
-
-}
+};
