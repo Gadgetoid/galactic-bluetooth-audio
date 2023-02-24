@@ -60,10 +60,49 @@
 #include "fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS 5
-#define FFT_SKIP_BINS 4 // Number of FFT bins to skip on the left, the low frequencies tend to be pretty boring visually
+#define FFT_SKIP_BINS 1 // Number of FFT bins to skip on the left, the low frequencies tend to be pretty boring visually
 
 constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
 constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
+
+struct LoudnessLookup {
+    int freq;
+    float multiplier;
+};
+
+// Amplitude to loudness lookup at 20 phons
+constexpr LoudnessLookup loudness_lookup[] = {
+    { 20, 0.2232641215f },
+    { 25, 0.241984271f },
+    { 31, 0.263227165f },
+    { 40, 0.2872737719f },
+    { 50, 0.3124023743f },
+    { 63, 0.341588386f },
+    { 80, 0.3760105283f },
+    { 100, 0.4133939644f },
+    { 125, 0.4551661356f },
+    { 160, 0.508001016f },
+    { 200, 0.5632216277f },
+    { 250, 0.6251953736f },
+    { 315, 0.6971070059f },
+    { 400, 0.7791195949f },
+    { 500, 0.8536064874f },
+    { 630, 0.9310986965f },
+    { 800, 0.9950248756f },
+    { 1000, 0.9995002499f },
+    { 1250, 0.9319664492f },
+    { 1600, 0.9345794393f },
+    { 2000, 1.101928375f },
+    { 2500, 1.300390117f },
+    { 3150, 1.402524544f },
+    { 4000, 1.321003963f },
+    { 5000, 1.073537305f },
+    { 6300, 0.7993605116f },
+    { 8000, 0.6345177665f },
+    { 10000, 0.5808887598f },
+    { 12500, 0.6053268765f },
+    { 20000, 0 }
+};
 
 struct RGB {
     uint8_t r, g, b;
@@ -96,6 +135,7 @@ Display display;
 constexpr int HISTORY_LEN = 21; // About 0.25s
 static uint history_idx = 0;
 static uint8_t eq_history[display.WIDTH][HISTORY_LEN] = {{0}};
+static fix15 loudness_adjust[display.WIDTH];
 
 FIX_FFT fft;
 
@@ -105,9 +145,23 @@ RGB palette_main[display.WIDTH];
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
 
+static void init_loudness(uint32_t sample_frequency) {
+    float scale = float(display.HEIGHT) * .318f;
+
+    for (int i = 0; i < display.WIDTH; ++i) {
+        int freq = (sample_frequency * 2) * (i + FFT_SKIP_BINS) / SAMPLE_COUNT;
+        int j = 0;
+        while (loudness_lookup[j+1].freq < freq) {
+            ++j;
+        }
+        float t = float(freq - loudness_lookup[j].freq) / float(loudness_lookup[j+1].freq - loudness_lookup[j].freq);
+        loudness_adjust[i] = float_to_fix15(scale * (t * loudness_lookup[j+1].multiplier + (1.f - t) * loudness_lookup[j].multiplier));
+        printf("%d %d %f\n", i, freq, fix15_to_float(loudness_adjust[i]));
+    }
+}
+
 // timer to fill output ring buffer
 static btstack_timer_source_t  driver_timer_sink;
-
 
 static bool btstack_audio_pico_sink_active;
 
@@ -136,6 +190,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     btstack_last_sample_idx = 0;
 
     btstack_volume = 127;
+    init_loudness(sample_frequency);
 
     audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLES_PER_AUDIO_BUFFER); // todo correct size
 
@@ -198,9 +253,8 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         }
 
         fft.update();
-        float scale = float(display.HEIGHT) * .318;
         for (auto i = 0u; i < display.WIDTH; i++) {
-            uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + FFT_SKIP_BINS, float_to_fix15(scale)));
+            uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
             uint8_t maxy = 0;
 
             for (int j = 0; j < HISTORY_LEN; ++j) {
