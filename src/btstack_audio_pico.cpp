@@ -60,7 +60,7 @@
 #include "fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS 5
-#define FFT_SKIP_BINS 8 // Number of FFT bins to skip on the left, the low frequencies tend to be pretty boring visually
+#define FFT_SKIP_BINS 4 // Number of FFT bins to skip on the left, the low frequencies tend to be pretty boring visually
 
 constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
 constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
