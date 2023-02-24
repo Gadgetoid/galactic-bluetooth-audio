@@ -36,14 +36,14 @@ class FIX_FFT {
         void FFT();
         void init();
     public:
-        uint16_t sample_array[SAMPLE_COUNT];
+        int16_t sample_array[SAMPLE_COUNT];
 
         FIX_FFT() : FIX_FFT(44100.0f) {};
         FIX_FFT(float sample_rate) : sample_rate(sample_rate) {
                 log2_samples = log2(SAMPLE_COUNT);
                 shift_amount = 16u - log2_samples;
 
-                memset(sample_array, 0, SAMPLE_COUNT);
+                memset(sample_array, 0, SAMPLE_COUNT * sizeof(int16_t));
 
                 memset(fr, 0, SAMPLE_COUNT * sizeof(fix15));
                 memset(fi, 0, SAMPLE_COUNT * sizeof(fix15));
@@ -55,4 +55,5 @@ class FIX_FFT {
         void update();
         float max_frequency();
         int get_scaled(unsigned int i, unsigned int scale);
+        int get_scaled_fix15(unsigned int i, fix15 scale);
 };
