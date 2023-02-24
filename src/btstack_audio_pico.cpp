@@ -200,12 +200,10 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         for (auto i = 0u; i < display.WIDTH; i++) {
             uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + FFT_SKIP_BINS, float_to_fix15(scale)));
             uint8_t maxy = 0;
-            int maxj = -1;
 
             for (int j = 0; j < HISTORY_LEN; ++j) {
                 if (eq_history[i][j] > maxy) {
                     maxy = eq_history[i][j];
-                    maxj = j;
                 }
             }
 
@@ -225,6 +223,9 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                     b = std::min((uint16_t)(palette_main[i].b), sample);
                     eq_history[i][history_idx] = y;
                     sample = 0;
+                    if (maxy < y) {
+                        maxy = y;
+                    }
                 } else if (y < maxy) {
                     r = (uint16_t)(palette_main[i].r) >> 2;
                     g = (uint16_t)(palette_main[i].g) >> 2;
@@ -232,7 +233,7 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 }
                 display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
             }
-            if (maxj != history_idx && maxy > 0) {
+            if (maxy > 0) {
                 RGB c = palette_peak[i];
                 display.set_pixel(i, display.HEIGHT - 1 - maxy, c.r, c.g, c.b);
             }
