@@ -252,9 +252,11 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             }
         }
 
+        constexpr float max_sample_from_fft = 3200.f;
+        constexpr fix15 multiple = float_to_fix15(pow(max_sample_from_fft / 255, -1.f / (display.HEIGHT - 1)));
         fft.update();
         for (auto i = 0u; i < display.WIDTH; i++) {
-            uint16_t sample = std::min((int16_t)(display.HEIGHT * 255), (int16_t)fft.get_scaled_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
+            fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
             uint8_t maxy = 0;
 
             for (int j = 0; j < HISTORY_LEN; ++j) {
@@ -267,16 +269,17 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 uint8_t r = 0;
                 uint8_t g = 0;
                 uint8_t b = 0;
-                if (sample > 255) {
+                if (sample > int_to_fix15(255)) {
                     r = (uint16_t)(palette_main[i].r);
                     g = (uint16_t)(palette_main[i].g);
                     b = (uint16_t)(palette_main[i].b);
-                    sample -= 255;
+                    sample = multiply_fix15_unit(multiple, sample);
                 }
                 else if (sample > 0) {
-                    r = std::min((uint16_t)(palette_main[i].r), sample);
-                    g = std::min((uint16_t)(palette_main[i].g), sample);
-                    b = std::min((uint16_t)(palette_main[i].b), sample);
+                    uint16_t int_sample = (uint16_t)fix15_to_int(sample);
+                    r = std::min((uint16_t)(palette_main[i].r), int_sample);
+                    g = std::min((uint16_t)(palette_main[i].g), int_sample);
+                    b = std::min((uint16_t)(palette_main[i].b), int_sample);
                     eq_history[i][history_idx] = y;
                     sample = 0;
                     if (maxy < y) {

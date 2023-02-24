@@ -14,6 +14,13 @@ constexpr __always_inline float fix15_to_float(fix15 a) {return (float)(a) / 327
 constexpr __always_inline fix15 int_to_fix15(int a) {return (fix15)(a << 15);}
 constexpr __always_inline int fix15_to_int(fix15 a) {return (int)(a >> 15);}
 
+// abs(a) must be <= 1
+constexpr __always_inline fix15 multiply_fix15_unit(fix15 a, fix15 b) {
+    int32_t bh = b >> 15;
+    int32_t bl = b & 0x7fff;
+    return ((a * bl) >> 15) + (a * bh);;
+}
+
 constexpr unsigned int SAMPLE_COUNT = 1024u;
 
 class FIX_FFT {
@@ -56,4 +63,5 @@ class FIX_FFT {
         float max_frequency();
         int get_scaled(unsigned int i, unsigned int scale);
         int get_scaled_fix15(unsigned int i, fix15 scale);
+        fix15 get_scaled_as_fix15(unsigned int i, fix15 scale);
 };
