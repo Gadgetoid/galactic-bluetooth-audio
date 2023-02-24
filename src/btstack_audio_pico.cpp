@@ -135,6 +135,8 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 
     btstack_last_sample_idx = 0;
 
+    btstack_volume = 127;
+
     audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLES_PER_AUDIO_BUFFER); // todo correct size
 
     audio_i2s_config_t config;
