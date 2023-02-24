@@ -13,7 +13,7 @@ pico_sdk_init()
 
 include(bluetooth/bluetooth.cmake)
 
-if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
+if(DISPLAY_PATH AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
 include(${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
 else()
 message(WARNING "Using default display (display/galactic/galactic_unicorn.cmake)...")
