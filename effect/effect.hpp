@@ -22,7 +22,6 @@ class RainbowFFT : public Effect {
         uint history_idx;
         uint8_t eq_history[32][HISTORY_LEN];
         fix15 loudness_adjust[32];
-        FIX_FFT fft;
         RGB palette_peak[32];
         RGB palette_main[32];
 
@@ -77,28 +76,12 @@ class RainbowFFT : public Effect {
             { 20000, 0 }
         };
 
+        FIX_FFT fft;
+
         void init_loudness(uint32_t sample_frequency);
 
     public:
-        RainbowFFT(DisplayBase& display) : Effect(display) {
-            history_idx = 0;
-
-            for(auto i = 0u; i < display.get_width(); i++) {
-                float h = float(i) / display.get_width();
-                palette_peak[i] = RGB::from_hsv(h, 0.7f, 1.0f);
-                palette_main[i] = RGB::from_hsv(h, 1.0f, 0.7f);
-            }
-
-            max_sample_from_fft = 4000.f + 130.f * display.get_height();
-            lower_threshold = 270 - 2 * display.get_height();
-#ifdef SCALE_LOGARITHMIC
-            multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.get_height() - 1)));
-#elif defined(SCALE_SQRT)
-            subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.get_height() * (display.get_height() - 1)));
-#elif defined(SCALE_LINEAR)
-            subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.get_height() - 1));
-#endif
-        }
+        RainbowFFT(DisplayBase& display) : Effect(display) {}
         void update(int16_t *buffer16, size_t sample_count) override;
         void init(uint32_t sample_frequency) override;
 };

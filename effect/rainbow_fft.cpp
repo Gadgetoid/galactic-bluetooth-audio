@@ -10,6 +10,7 @@ void RainbowFFT::update(int16_t *buffer16, size_t sample_count) {
     }
 
     fft.update();
+
     for (auto i = 0u; i < display.get_width(); i++) {
         fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
         uint8_t maxy = 0;
@@ -81,5 +82,25 @@ void RainbowFFT::init_loudness(uint32_t sample_frequency) {
 }
 
 void RainbowFFT::init(uint32_t sample_frequency) {
+    printf("RainbowFFT: %ix%i\n", display.get_width(), display.get_height());
+
+    history_idx = 0;
+
+    for(auto i = 0u; i < display.get_width(); i++) {
+        float h = float(i) / display.get_width();
+        palette_peak[i] = RGB::from_hsv(h, 0.7f, 1.0f);
+        palette_main[i] = RGB::from_hsv(h, 1.0f, 0.7f);
+    }
+
+    max_sample_from_fft = 4000.f + 130.f * display.get_height();
+    lower_threshold = 270 - 2 * display.get_height();
+#ifdef SCALE_LOGARITHMIC
+    multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.get_height() - 1)));
+#elif defined(SCALE_SQRT)
+    subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.get_height() * (display.get_height() - 1)));
+#elif defined(SCALE_LINEAR)
+    subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.get_height() - 1));
+#endif
+
     init_loudness(sample_frequency);
 }
