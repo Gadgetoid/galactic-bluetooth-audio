@@ -16,5 +16,3 @@ target_include_directories(rainbow_fft INTERFACE
 target_compile_definitions(rainbow_fft INTERFACE
   -DSCALE_SQRT
 )
-
-set(EFFECT_NAME "Rainbow FFT")
