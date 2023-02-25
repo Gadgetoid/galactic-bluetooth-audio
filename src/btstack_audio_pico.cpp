@@ -57,108 +57,20 @@
 #include "pico/stdlib.h"
 
 #include "display.hpp"
-#include "fixed_fft.hpp"
+#include "effect.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS 5
-#define FFT_SKIP_BINS 1 // Number of FFT bins to skip on the left, the low frequencies tend to be pretty boring visually
-
-constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
-constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
-
-struct LoudnessLookup {
-    int freq;
-    float multiplier;
-};
-
-// Amplitude to loudness lookup at 20 phons
-constexpr LoudnessLookup loudness_lookup[] = {
-    { 20, 0.2232641215f },
-    { 25, 0.241984271f },
-    { 31, 0.263227165f },
-    { 40, 0.2872737719f },
-    { 50, 0.3124023743f },
-    { 63, 0.341588386f },
-    { 80, 0.3760105283f },
-    { 100, 0.4133939644f },
-    { 125, 0.4551661356f },
-    { 160, 0.508001016f },
-    { 200, 0.5632216277f },
-    { 250, 0.6251953736f },
-    { 315, 0.6971070059f },
-    { 400, 0.7791195949f },
-    { 500, 0.8536064874f },
-    { 630, 0.9310986965f },
-    { 800, 0.9950248756f },
-    { 1000, 0.9995002499f },
-    { 1250, 0.9319664492f },
-    { 1600, 0.9345794393f },
-    { 2000, 1.101928375f },
-    { 2500, 1.300390117f },
-    { 3150, 1.402524544f },
-    { 4000, 1.321003963f },
-    { 5000, 1.073537305f },
-    { 6300, 0.7993605116f },
-    { 8000, 0.6345177665f },
-    { 10000, 0.5808887598f },
-    { 12500, 0.6053268765f },
-    { 20000, 0 }
-};
-
-struct RGB {
-    uint8_t r, g, b;
-
-    constexpr RGB() : r(0), g(0), b(0) {}
-    constexpr RGB(uint c) : r((c >> 16) & 0xff), g((c >> 8) & 0xff), b(c & 0xff) {}
-    constexpr RGB(uint8_t r, uint8_t g, uint8_t b) : r(r), g(g), b(b) {}
-
-    static RGB from_hsv(float h, float s, float v) {
-        int i = h * 6.0f;
-        float f = (h * 6.0f) - i;
-        v *= 255.0f;
-        uint8_t p = v * (1.0f - s);
-        uint8_t q = v * (1.0f - (f * s));
-        uint8_t t = v * (1.0f - ((1.0f - f) * s));
-
-        switch (i % 6) {
-        default:
-        case 0: return RGB(v, t, p);
-        case 1: return RGB(q, v, p);
-        case 2: return RGB(p, v, t);
-        case 3: return RGB(p, q, v);
-        case 4: return RGB(t, p, v);
-        case 5: return RGB(v, p, q);
-        }
-    }
-};
 
 Display display;
-constexpr int HISTORY_LEN = 21; // About 0.25s
-static uint history_idx = 0;
-static uint8_t eq_history[display.WIDTH][HISTORY_LEN] = {{0}};
-static fix15 loudness_adjust[display.WIDTH];
+RainbowFFT effect(display);
 
-FIX_FFT fft;
 
-RGB palette_peak[display.WIDTH];
-RGB palette_main[display.WIDTH];
+static constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
+static constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
+
 
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
-
-static void init_loudness(uint32_t sample_frequency) {
-    float scale = float(display.HEIGHT) * .318f;
-
-    for (int i = 0; i < display.WIDTH; ++i) {
-        int freq = (sample_frequency * 2) * (i + FFT_SKIP_BINS) / SAMPLE_COUNT;
-        int j = 0;
-        while (loudness_lookup[j+1].freq < freq) {
-            ++j;
-        }
-        float t = float(freq - loudness_lookup[j].freq) / float(loudness_lookup[j+1].freq - loudness_lookup[j].freq);
-        loudness_adjust[i] = float_to_fix15(scale * (t * loudness_lookup[j+1].multiplier + (1.f - t) * loudness_lookup[j].multiplier));
-        printf("%d %d %f\n", i, freq, fix15_to_float(loudness_adjust[i]));
-    }
-}
 
 // timer to fill output ring buffer
 static btstack_timer_source_t  driver_timer_sink;
@@ -190,7 +102,6 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     btstack_last_sample_idx = 0;
 
     btstack_volume = 127;
-    init_loudness(sample_frequency);
 
     audio_buffer_pool_t * producer_pool = audio_new_producer_pool(&btstack_audio_pico_producer_format, 3, SAMPLES_PER_AUDIO_BUFFER); // todo correct size
 
@@ -211,16 +122,11 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     assert(ok);
     (void)ok;
 
+    effect.init(sample_frequency);
 
     display.init();
     display.clear();
     display.set_pixel(0, 0, 255, 0, 0);
-
-    for(auto i = 0u; i < display.WIDTH; i++) {
-        float h = float(i) / display.WIDTH;
-        palette_peak[i] = RGB::from_hsv(h, 0.7f, 1.0f);
-        palette_main[i] = RGB::from_hsv(h, 1.0f, 0.7f);
-    }
 
     return producer_pool;
 }
@@ -235,11 +141,9 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
-        int16_t* fft_array = &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER * (BUFFERS_PER_FFT_SAMPLE - 1)];
-        memmove(fft.sample_array, &fft.sample_array[SAMPLES_PER_AUDIO_BUFFER], (BUFFERS_PER_FFT_SAMPLE - 1) * sizeof(uint16_t));
+        effect.update(buffer16, SAMPLE_COUNT);
+
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
-            fft_array[i] = buffer16[i];
-            // Apply volume after copying to FFT
             buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
         }
 
@@ -251,77 +155,6 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 buffer16[2*i+1] = buffer16[i];
             }
         }
-
-// Choose one:
-//#define SCALE_LOGARITHMIC
-#define SCALE_SQRT
-//#define SCALE_LINEAR
-
-        constexpr float max_sample_from_fft = 4000.f + 130.f * display.HEIGHT;
-        constexpr int lower_threshold = 270 - 2 * display.HEIGHT;
-#ifdef SCALE_LOGARITHMIC
-        constexpr fix15 multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.HEIGHT - 1)));
-#elif defined(SCALE_SQRT)
-        constexpr fix15 subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.HEIGHT * (display.HEIGHT - 1)));
-#elif defined(SCALE_LINEAR)
-        constexpr fix15 subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.HEIGHT - 1));
-#else
-    #error "Choose a scale mode"
-#endif
-        fft.update();
-        for (auto i = 0u; i < display.WIDTH; i++) {
-            fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
-            uint8_t maxy = 0;
-
-            for (int j = 0; j < HISTORY_LEN; ++j) {
-                if (eq_history[i][j] > maxy) {
-                    maxy = eq_history[i][j];
-                }
-            }
-
-#ifdef SCALE_SQRT
-            fix15 subtract = subtract_step;
-#endif
-            for (auto y = 0; y < display.HEIGHT; y++) {
-                uint8_t r = 0;
-                uint8_t g = 0;
-                uint8_t b = 0;
-                if (sample > int_to_fix15(lower_threshold)) {
-                    r = (uint16_t)(palette_main[i].r);
-                    g = (uint16_t)(palette_main[i].g);
-                    b = (uint16_t)(palette_main[i].b);
-#ifdef SCALE_LOGARITHMIC
-                    sample = multiply_fix15_unit(multiple, sample);
-#else 
-                    sample = std::max(1, sample - subtract);
-#ifdef SCALE_SQRT
-                    subtract += subtract_step;
-#endif
-#endif
-                }
-                else if (sample > 0) {
-                    uint16_t int_sample = (uint16_t)fix15_to_int(sample);
-                    r = std::min((uint16_t)(palette_main[i].r), int_sample);
-                    g = std::min((uint16_t)(palette_main[i].g), int_sample);
-                    b = std::min((uint16_t)(palette_main[i].b), int_sample);
-                    eq_history[i][history_idx] = y;
-                    sample = 0;
-                    if (maxy < y) {
-                        maxy = y;
-                    }
-                } else if (y < maxy) {
-                    r = (uint16_t)(palette_main[i].r) >> 2;
-                    g = (uint16_t)(palette_main[i].g) >> 2;
-                    b = (uint16_t)(palette_main[i].b) >> 2;
-                }
-                display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
-            }
-            if (maxy > 0) {
-                RGB c = palette_peak[i];
-                display.set_pixel(i, display.HEIGHT - 1 - maxy, c.r, c.g, c.b);
-            }
-        }
-        history_idx = (history_idx + 1) % HISTORY_LEN;
 
         audio_buffer->sample_count = audio_buffer->max_sample_count;
         give_audio_buffer(btstack_audio_pico_audio_buffer_pool, audio_buffer);

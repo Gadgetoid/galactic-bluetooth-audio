@@ -1,8 +1,9 @@
 #pragma once
 
 #include "hardware/pio.h"
+#include "displaybase.hpp"
 
-class Display {
+class Display : public DisplayBase {
   public:
     static const int WIDTH  = 32;
     static const int HEIGHT = 32;
@@ -58,26 +59,22 @@ class Display {
     // must be aligned for 32bit dma transfer
     alignas(4) uint8_t bitstream[BITSTREAM_LENGTH] = {0};
     const uint32_t bitstream_addr = (uint32_t)bitstream;
+    void dma_safe_abort(uint channel);
+
   public:
     ~Display();
 
-    void init();
-    static inline void pio_program_init(PIO pio, uint sm, uint offset);
+    void init() override;
+    void clear() override;
+    void update() override;
+    void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) override;
 
-    void clear();
-
-    void update();
+    const int get_width() override {return WIDTH;};
+    const int get_height() override {return HEIGHT;};
 
     void set_brightness(float value);
     float get_brightness();
     void adjust_brightness(float delta);
 
-    void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
-
     uint16_t light();
-
-    bool is_pressed(uint8_t button);
-
-  private:
-    void dma_safe_abort(uint channel);
 };

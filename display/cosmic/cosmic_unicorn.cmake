@@ -6,7 +6,10 @@ target_sources(display INTERFACE
   ${CMAKE_CURRENT_LIST_DIR}/cosmic_unicorn.cpp
 )
 
-target_include_directories(display INTERFACE ${CMAKE_CURRENT_LIST_DIR})
+target_include_directories(display INTERFACE
+  ${CMAKE_CURRENT_LIST_DIR}
+  ${CMAKE_CURRENT_LIST_DIR}/../
+)
 
 # Pull in pico libraries that we need
 target_link_libraries(display INTERFACE pico_stdlib hardware_adc hardware_pio hardware_dma)
