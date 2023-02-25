@@ -89,14 +89,14 @@ class RainbowFFT : public Effect {
                 palette_main[i] = RGB::from_hsv(h, 1.0f, 0.7f);
             }
 
-            float max_sample_from_fft = 4000.f + 130.f * display.get_height();
-            int lower_threshold = 270 - 2 * display.get_height();
+            max_sample_from_fft = 4000.f + 130.f * display.get_height();
+            lower_threshold = 270 - 2 * display.get_height();
 #ifdef SCALE_LOGARITHMIC
-            fix15 multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.get_height() - 1)));
+            multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.get_height() - 1)));
 #elif defined(SCALE_SQRT)
-            fix15 subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.get_height() * (display.get_height() - 1)));
+            subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.get_height() * (display.get_height() - 1)));
 #elif defined(SCALE_LINEAR)
-            fix15 subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.get_height() - 1));
+            subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.get_height() - 1));
 #endif
         }
         void update(int16_t *buffer16, size_t sample_count) override;
