@@ -252,9 +252,22 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             }
         }
 
-        constexpr float max_sample_from_fft = 4000.f + 100.f * display.HEIGHT;
+// Choose one:
+//#define SCALE_LOGARITHMIC
+#define SCALE_SQRT
+//#define SCALE_LINEAR
+
+        constexpr float max_sample_from_fft = 4000.f + 130.f * display.HEIGHT;
         constexpr int lower_threshold = 270 - 2 * display.HEIGHT;
+#ifdef SCALE_LOGARITHMIC
         constexpr fix15 multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.HEIGHT - 1)));
+#elif defined(SCALE_SQRT)
+        constexpr fix15 subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.HEIGHT * (display.HEIGHT - 1)));
+#elif defined(SCALE_LINEAR)
+        constexpr fix15 subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.HEIGHT - 1));
+#else
+    #error "Choose a scale mode"
+#endif
         fft.update();
         for (auto i = 0u; i < display.WIDTH; i++) {
             fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
@@ -266,6 +279,9 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 }
             }
 
+#ifdef SCALE_SQRT
+            fix15 subtract = subtract_step;
+#endif
             for (auto y = 0; y < display.HEIGHT; y++) {
                 uint8_t r = 0;
                 uint8_t g = 0;
@@ -274,7 +290,14 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                     r = (uint16_t)(palette_main[i].r);
                     g = (uint16_t)(palette_main[i].g);
                     b = (uint16_t)(palette_main[i].b);
+#ifdef SCALE_LOGARITHMIC
                     sample = multiply_fix15_unit(multiple, sample);
+#else 
+                    sample = std::max(1, sample - subtract);
+#ifdef SCALE_SQRT
+                    subtract += subtract_step;
+#endif
+#endif
                 }
                 else if (sample > 0) {
                     uint16_t int_sample = (uint16_t)fix15_to_int(sample);
