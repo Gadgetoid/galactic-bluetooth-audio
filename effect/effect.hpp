@@ -22,6 +22,9 @@ class RainbowFFT : public Effect {
         uint history_idx;
         uint8_t eq_history[32][HISTORY_LEN];
         fix15 loudness_adjust[32];
+
+
+        FIX_FFT fft;
         RGB palette_peak[32];
         RGB palette_main[32];
 
@@ -75,8 +78,6 @@ class RainbowFFT : public Effect {
             { 12500, 0.6053268765f },
             { 20000, 0 }
         };
-
-        FIX_FFT fft;
 
         void init_loudness(uint32_t sample_frequency);
 
