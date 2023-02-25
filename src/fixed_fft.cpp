@@ -28,6 +28,10 @@ int FIX_FFT::get_scaled_fix15(unsigned int i, fix15 scale) {
     return fix15_to_int(multiply_fix15(fr[i], scale));
 }
 
+int FIX_FFT::get_scaled_as_fix15(unsigned int i, fix15 scale) {
+    return multiply_fix15(fr[i], scale);
+}
+
 void FIX_FFT::init() {
 
     // Populate Filter and Sine tables
@@ -73,13 +77,6 @@ void FIX_FFT::update() {
 
 float FIX_FFT::max_frequency() {
     return max_freq_dex * (sample_rate / SAMPLE_COUNT);
-}
-
-// abs(a) must be <= 1
-constexpr __always_inline fix15 multiply_fix15_unit(fix15 a, fix15 b) {
-    int32_t bh = b >> 15;
-    int32_t bl = b & 0x7fff;
-    return ((a * bl) >> 15) + (a * bh);;
 }
 
 void FIX_FFT::FFT() {
