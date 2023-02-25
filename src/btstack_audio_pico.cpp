@@ -252,8 +252,8 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             }
         }
 
-        constexpr float max_sample_from_fft = 3200.f; // Maybe 3500 on Cosmic
-        constexpr int lower_threshold = 255;          // Maybe 200 on Cosmic
+        constexpr float max_sample_from_fft = 4000.f + 100.f * display.HEIGHT;
+        constexpr int lower_threshold = 270 - 2 * display.HEIGHT;
         constexpr fix15 multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.HEIGHT - 1)));
         fft.update();
         for (auto i = 0u; i < display.WIDTH; i++) {
