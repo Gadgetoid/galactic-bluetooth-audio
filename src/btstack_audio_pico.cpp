@@ -142,6 +142,8 @@ FIX_FFT fft;
 RGB palette_peak[display.WIDTH];
 RGB palette_main[display.WIDTH];
 
+RGB palette_vert[display.HEIGHT];
+
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
 
@@ -222,6 +224,13 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
         palette_main[i] = RGB::from_hsv(h, 1.0f, 0.7f);
     }
 
+    for(auto i = 0u; i < display.HEIGHT; i++) {
+        int n = floor(i / 4) * 4;
+        float h = 0.4 * float(n) / display.HEIGHT;
+        h = 0.333 - h;
+        palette_vert[i] = RGB::from_hsv(h, 1.0f, 1.0f);
+    }
+
     return producer_pool;
 }
 
@@ -287,9 +296,9 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 uint8_t g = 0;
                 uint8_t b = 0;
                 if (sample > int_to_fix15(lower_threshold)) {
-                    r = (uint16_t)(palette_main[i].r);
-                    g = (uint16_t)(palette_main[i].g);
-                    b = (uint16_t)(palette_main[i].b);
+                    r = (uint16_t)(palette_vert[y].r);
+                    g = (uint16_t)(palette_vert[y].g);
+                    b = (uint16_t)(palette_vert[y].b);
 #ifdef SCALE_LOGARITHMIC
                     sample = multiply_fix15_unit(multiple, sample);
 #else 
@@ -301,23 +310,23 @@ static void btstack_audio_pico_sink_fill_buffers(void){
                 }
                 else if (sample > 0) {
                     uint16_t int_sample = (uint16_t)fix15_to_int(sample);
-                    r = std::min((uint16_t)(palette_main[i].r), int_sample);
-                    g = std::min((uint16_t)(palette_main[i].g), int_sample);
-                    b = std::min((uint16_t)(palette_main[i].b), int_sample);
+                    r = std::min((uint16_t)(palette_vert[y].r), int_sample);
+                    g = std::min((uint16_t)(palette_vert[y].g), int_sample);
+                    b = std::min((uint16_t)(palette_vert[y].b), int_sample);
                     eq_history[i][history_idx] = y;
                     sample = 0;
                     if (maxy < y) {
                         maxy = y;
                     }
                 } else if (y < maxy) {
-                    r = (uint16_t)(palette_main[i].r) >> 2;
-                    g = (uint16_t)(palette_main[i].g) >> 2;
-                    b = (uint16_t)(palette_main[i].b) >> 2;
+                    r = (uint16_t)(palette_vert[y].r) >> 3;
+                    g = (uint16_t)(palette_vert[y].g) >> 3;
+                    b = (uint16_t)(palette_vert[y].b) >> 3;
                 }
                 display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
             }
             if (maxy > 0) {
-                RGB c = palette_peak[i];
+                RGB c = palette_vert[display.HEIGHT - 1];
                 display.set_pixel(i, display.HEIGHT - 1 - maxy, c.r, c.g, c.b);
             }
         }
