@@ -146,7 +146,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     display.clear();
     display.set_pixel(0, 0, 255, 0, 0);
 
-    multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
+    //multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
 
     return producer_pool;
 }
@@ -161,12 +161,14 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
-        mutex_enter_blocking(&core1_effect_update);
+        effect.update(buffer16, SAMPLE_COUNT);
+
+        //mutex_enter_blocking(&core1_effect_update);
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
-            effect_buf[i] = buffer16[i];
+            //effect_buf[i] = buffer16[i];
             buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
         }
-        mutex_exit(&core1_effect_update);
+        //mutex_exit(&core1_effect_update);
 
         // duplicate samples for mono
         if (btstack_audio_pico_channel_count == 1){

@@ -11,7 +11,7 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
 
     fft.update();
 
-    for (auto i = 0u; i < width; i++) {
+    for (auto i = 0u; i < display.WIDTH; i++) {
         fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS));
         uint8_t maxy = 0;
 
@@ -24,7 +24,7 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
 #ifdef SCALE_SQRT
         fix15 subtract = subtract_step;
 #endif
-        for (auto y = 0; y < height; y++) {
+        for (auto y = 0; y < display.HEIGHT; y++) {
             uint8_t r = 0;
             uint8_t g = 0;
             uint8_t b = 0;
@@ -56,37 +56,37 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
                 g = (uint16_t)(palette[y].g) >> 3;
                 b = (uint16_t)(palette[y].b) >> 3;
             }
-            display.set_pixel(i, height - 1 - y, r, g, b);
+            display.set_pixel(i, display.HEIGHT - 1 - y, r, g, b);
         }
         if (maxy > 0) {
-            RGB c = palette[height - 1];
-            display.set_pixel(i, height - 1 - maxy, c.r, c.g, c.b);
+            RGB c = palette[display.HEIGHT - 1];
+            display.set_pixel(i, display.HEIGHT - 1 - maxy, c.r, c.g, c.b);
         }
     }
     history_idx = (history_idx + 1) % HISTORY_LEN;
 }
 
 void ClassicFFT::init(uint32_t sample_frequency) {
-    printf("ClassicFFT: %ix%i\n", width, height);
+    printf("ClassicFFT: %ix%i\n", display.WIDTH, display.HEIGHT);
 
     history_idx = 0;
 
-    fft.set_scale(height * .318f);
+    fft.set_scale(display.HEIGHT * .318f);
 
-    for(auto i = 0u; i < height; i++) {
+    for(auto i = 0u; i < display.HEIGHT; i++) {
         int n = floor(i / 4) * 4;
-        float h = 0.4 * float(n) / height;
+        float h = 0.4 * float(n) / display.HEIGHT;
         h = 0.333 - h;
         palette[i] = RGB::from_hsv(h, 1.0f, 1.0f);
     }
 
-    max_sample_from_fft = 4000.f + 130.f * height;
-    lower_threshold = 270 - 2 * height;
+    max_sample_from_fft = 4000.f + 130.f * display.HEIGHT;
+    lower_threshold = 270 - 2 * display.HEIGHT;
 #ifdef SCALE_LOGARITHMIC
-    multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (height - 1)));
+    multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.HEIGHT - 1)));
 #elif defined(SCALE_SQRT)
-    subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (height * (height - 1)));
+    subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.HEIGHT * (display.HEIGHT - 1)));
 #elif defined(SCALE_LINEAR)
-    subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (height - 1));
+    subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.HEIGHT - 1));
 #endif
 }

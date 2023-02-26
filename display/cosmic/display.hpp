@@ -1,9 +1,8 @@
 #pragma once
 
 #include "hardware/pio.h"
-#include "displaybase.hpp"
 
-class Display : public DisplayBase {
+class Display {
   public:
     static const int WIDTH  = 32;
     static const int HEIGHT = 32;
@@ -64,13 +63,10 @@ class Display : public DisplayBase {
   public:
     ~Display();
 
-    void init() override;
-    void clear() override;
-    void update() override;
-    void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) override;
-
-    const int get_width() override {return WIDTH;};
-    const int get_height() override {return HEIGHT;};
+    void init();
+    void clear();
+    void update();
+    void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 
     void set_brightness(float value);
     float get_brightness();

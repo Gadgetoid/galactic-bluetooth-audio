@@ -1,21 +1,16 @@
 #pragma once
 #include <functional>
-#include "displaybase.hpp"
+#include "display.hpp"
 #include "lib/fixed_fft.hpp"
 #include "lib/rgb.hpp"
 
 class Effect {
     public:
-        DisplayBase &display;
+        Display &display;
         FIX_FFT &fft;
-        int width;
-        int height;
-        Effect(DisplayBase& display, FIX_FFT& fft) : 
+        Effect(Display& display, FIX_FFT& fft) : 
             display(display), 
-            fft(fft) {
-                width = display.get_width();
-                height = display.get_height();
-            };
+            fft(fft) {};
         virtual void init(uint32_t sample_frequency);
         virtual void update(int16_t *buffer16, size_t sample_count);
 };
@@ -28,10 +23,10 @@ class RainbowFFT : public Effect {
         static constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
         static constexpr int HISTORY_LEN = 21; // About 0.25s
         uint history_idx;
-        uint8_t eq_history[32][HISTORY_LEN];
+        uint8_t eq_history[Display::WIDTH][HISTORY_LEN];
 
-        RGB palette_peak[32];
-        RGB palette_main[32];
+        RGB palette_peak[Display::WIDTH];
+        RGB palette_main[Display::WIDTH];
 
         float max_sample_from_fft;
         int lower_threshold;
@@ -46,7 +41,7 @@ class RainbowFFT : public Effect {
 #endif
 
     public:
-        RainbowFFT(DisplayBase& display, FIX_FFT& fft) : Effect(display, fft) {}
+        RainbowFFT(Display& display, FIX_FFT& fft) : Effect(display, fft) {}
         void update(int16_t *buffer16, size_t sample_count) override;
         void init(uint32_t sample_frequency) override;
 };
@@ -59,9 +54,9 @@ class ClassicFFT : public Effect {
         static constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
         static constexpr int HISTORY_LEN = 21; // About 0.25s
         uint history_idx;
-        uint8_t eq_history[32][HISTORY_LEN];
+        uint8_t eq_history[Display::WIDTH][HISTORY_LEN];
 
-        RGB palette[32];
+        RGB palette[Display::WIDTH];
 
         float max_sample_from_fft;
         int lower_threshold;
@@ -76,7 +71,7 @@ class ClassicFFT : public Effect {
 #endif
 
     public:
-        ClassicFFT(DisplayBase& display, FIX_FFT &fft) : Effect(display, fft) {}
+        ClassicFFT(Display& display, FIX_FFT &fft) : Effect(display, fft) {}
         void update(int16_t *buffer16, size_t sample_count) override;
         void init(uint32_t sample_frequency) override;
 };
