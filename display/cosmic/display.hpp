@@ -58,26 +58,19 @@ class Display {
     // must be aligned for 32bit dma transfer
     alignas(4) uint8_t bitstream[BITSTREAM_LENGTH] = {0};
     const uint32_t bitstream_addr = (uint32_t)bitstream;
+    void dma_safe_abort(uint channel);
+
   public:
     ~Display();
 
     void init();
-    static inline void pio_program_init(PIO pio, uint sm, uint offset);
-
     void clear();
-
     void update();
+    void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
 
     void set_brightness(float value);
     float get_brightness();
     void adjust_brightness(float delta);
 
-    void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
-
     uint16_t light();
-
-    bool is_pressed(uint8_t button);
-
-  private:
-    void dma_safe_abort(uint channel);
 };

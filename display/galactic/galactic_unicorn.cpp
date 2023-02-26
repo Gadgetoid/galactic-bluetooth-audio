@@ -332,6 +332,6 @@ void Display::adjust_brightness(float delta) {
   this->set_brightness(this->get_brightness() + delta);
 }
 
-void update() {
+void Display::update() {
   // do something here, probably do the FFT and write the display back buffer?
 }
