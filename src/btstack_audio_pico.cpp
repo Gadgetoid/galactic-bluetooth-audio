@@ -66,10 +66,14 @@
 
 Display display;
 FIX_FFT fft;
-RainbowFFT effect(display, fft);
 
+std::vector<Effect *> effects;
+
+#ifdef EFFECTS_ON_CORE1
 constexpr int core1_stack_len = 512;
 uint32_t core1_stack[512];
+int16_t effect_buf[SAMPLE_COUNT] = {0};
+#endif
 
 static constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
 static constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
@@ -94,15 +98,15 @@ static uint8_t               btstack_last_sample_idx;
 
 auto_init_mutex(core1_effect_update);
 
-int16_t effect_buf[SAMPLE_COUNT] = {0};
-
+#ifdef EFFECTS_ON_CORE1
 void core1_entry() {
     while(1) {
         mutex_enter_blocking(&core1_effect_update);
-        effect.update(effect_buf, SAMPLE_COUNT);
+        effects[0]->update(effect_buf, SAMPLE_COUNT);
         mutex_exit(&core1_effect_update);
     }
 }
+#endif
 
 static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channel_count) {
 
@@ -140,12 +144,19 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     assert(ok);
     (void)ok;
 
-    effect.init(sample_frequency);
+    effects.push_back(new RainbowFFT(display, fft));
+    effects.push_back(new ClassicFFT(display, fft));
+
+    for(auto &effect : effects) {
+        effect->init(sample_frequency);
+    }
 
     display.init();
     display.clear();
 
-    //multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
+#ifdef EFFECTS_ON_CORE1
+    multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
+#endif
 
     return producer_pool;
 }
@@ -160,14 +171,22 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
-        effect.update(buffer16, SAMPLE_COUNT);
+#ifndef EFFECTS_ON_CORE1
+        effects[0]->update(buffer16, SAMPLE_COUNT);
+#endif
 
-        //mutex_enter_blocking(&core1_effect_update);
+#ifdef EFFECTS_ON_CORE1
+        mutex_enter_blocking(&core1_effect_update);
+#endif
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
-            //effect_buf[i] = buffer16[i];
+#ifdef EFFECTS_ON_CORE1
+            effect_buf[i] = buffer16[i];
+#endif
             buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
         }
-        //mutex_exit(&core1_effect_update);
+#ifdef EFFECTS_ON_CORE1
+        mutex_exit(&core1_effect_update);
+#endif
 
         // duplicate samples for mono
         if (btstack_audio_pico_channel_count == 1){
