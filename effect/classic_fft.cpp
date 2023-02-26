@@ -11,8 +11,8 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
 
     fft.update();
 
-    for (auto i = 0u; i < display.get_width(); i++) {
-        fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS, loudness_adjust[i]));
+    for (auto i = 0u; i < width; i++) {
+        fix15 sample = std::min(float_to_fix15(max_sample_from_fft), fft.get_scaled_as_fix15(i + FFT_SKIP_BINS));
         uint8_t maxy = 0;
 
         for (int j = 0; j < HISTORY_LEN; ++j) {
@@ -24,7 +24,7 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
 #ifdef SCALE_SQRT
         fix15 subtract = subtract_step;
 #endif
-        for (auto y = 0; y < display.get_height(); y++) {
+        for (auto y = 0; y < height; y++) {
             uint8_t r = 0;
             uint8_t g = 0;
             uint8_t b = 0;
@@ -56,52 +56,37 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
                 g = (uint16_t)(palette[y].g) >> 2;
                 b = (uint16_t)(palette[y].b) >> 2;
             }
-            display.set_pixel(i, display.get_height() - 1 - y, r, g, b);
+            display.set_pixel(i, height - 1 - y, r, g, b);
         }
         if (maxy > 0) {
-            RGB c = palette[display.get_height() - 1];
-            display.set_pixel(i, display.get_height() - 1 - maxy, c.r, c.g, c.b);
+            RGB c = palette[height - 1];
+            display.set_pixel(i, height - 1 - maxy, c.r, c.g, c.b);
         }
     }
     history_idx = (history_idx + 1) % HISTORY_LEN;
 }
 
-void ClassicFFT::init_loudness(uint32_t sample_frequency) {
-    float scale = float(display.get_height()) * .318f;
-
-    for (int i = 0; i < display.get_width(); ++i) {
-        int freq = (sample_frequency * 2) * (i + FFT_SKIP_BINS) / SAMPLE_COUNT;
-        int j = 0;
-        while (loudness_lookup[j+1].freq < freq) {
-            ++j;
-        }
-        float t = float(freq - loudness_lookup[j].freq) / float(loudness_lookup[j+1].freq - loudness_lookup[j].freq);
-        loudness_adjust[i] = float_to_fix15(scale * (t * loudness_lookup[j+1].multiplier + (1.f - t) * loudness_lookup[j].multiplier));
-        printf("%d %d %f\n", i, freq, fix15_to_float(loudness_adjust[i]));
-    }
-}
-
 void ClassicFFT::init(uint32_t sample_frequency) {
-    printf("ClassicFFT: %ix%i\n", display.get_width(), display.get_height());
+    printf("ClassicFFT: %ix%i\n", width, height);
 
     history_idx = 0;
 
-    for(auto i = 0u; i < display.get_height(); i++) {
+    fft.set_scale(height * .318f);
+
+    for(auto i = 0u; i < height; i++) {
         int n = floor(i / 4) * 4;
-        float h = 0.4 * float(n) / display.get_height();
+        float h = 0.4 * float(n) / height;
         h = 0.333 - h;
         palette[i] = RGB::from_hsv(h, 1.0f, 1.0f);
     }
 
-    max_sample_from_fft = 4000.f + 130.f * display.get_height();
-    lower_threshold = 270 - 2 * display.get_height();
+    max_sample_from_fft = 4000.f + 130.f * height;
+    lower_threshold = 270 - 2 * height;
 #ifdef SCALE_LOGARITHMIC
-    multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (display.get_height() - 1)));
+    multiple = float_to_fix15(pow(max_sample_from_fft / lower_threshold, -1.f / (height - 1)));
 #elif defined(SCALE_SQRT)
-    subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (display.get_height() * (display.get_height() - 1)));
+    subtract_step = float_to_fix15((max_sample_from_fft - lower_threshold) * 2.f / (height * (height - 1)));
 #elif defined(SCALE_LINEAR)
-    subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (display.get_height() - 1));
+    subtract = float_to_fix15((max_sample_from_fft - lower_threshold) / (height - 1));
 #endif
-
-    init_loudness(sample_frequency);
 }

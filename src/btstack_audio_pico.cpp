@@ -58,11 +58,13 @@
 
 #include "display.hpp"
 #include "effect.hpp"
+#include "lib/fixed_fft.hpp"
 
 #define DRIVER_POLL_INTERVAL_MS 5
 
 Display display;
-RainbowFFT effect(display);
+FIX_FFT fft;
+RainbowFFT effect(display, fft);
 
 
 static constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;

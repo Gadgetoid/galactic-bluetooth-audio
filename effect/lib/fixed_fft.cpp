@@ -20,20 +20,19 @@ uint16_t __always_inline __revs(uint16_t v) {
 FIX_FFT::~FIX_FFT() {
 }
 
-int FIX_FFT::get_scaled(unsigned int i, unsigned int scale) {
-    return fix15_to_int(multiply_fix15(fr[i], int_to_fix15(scale)));
+int FIX_FFT::get_scaled(unsigned int i) {
+    return fix15_to_int(multiply_fix15(fr[i], loudness_adjust[i]));
 }
 
-int FIX_FFT::get_scaled_fix15(unsigned int i, fix15 scale) {
-    return fix15_to_int(multiply_fix15(fr[i], scale));
+int FIX_FFT::get_scaled_fix15(unsigned int i) {
+    return fix15_to_int(multiply_fix15(fr[i], loudness_adjust[i]));
 }
 
-int FIX_FFT::get_scaled_as_fix15(unsigned int i, fix15 scale) {
-    return multiply_fix15(fr[i], scale);
+int FIX_FFT::get_scaled_as_fix15(unsigned int i) {
+    return multiply_fix15(fr[i], loudness_adjust[i]);
 }
 
 void FIX_FFT::init() {
-
     // Populate Filter and Sine tables
     for (auto ii = 0u; ii < SAMPLE_COUNT; ii++) {
         // Full sine wave with period NUM_SAMPLES
@@ -43,6 +42,18 @@ void FIX_FFT::init() {
         // This is a crude approximation of a Lanczos window.
         // Wolfram Alpha Comparison: Plot[0.5 * (1.0 - cos(2 * pi * (x / 1.0))), {x, 0, 1}], Plot[LanczosWindow[x - 0.5], {x, 0, 1}]
         filter_window[ii] = float_to_fix15(0.5f * (1.0f - cos((M_PI * 2.0f) * ((float) ii) / ((float)SAMPLE_COUNT))));
+    }
+}
+
+void FIX_FFT::set_scale(float scale) {
+    for (int i = 0; i < SAMPLE_COUNT; ++i) {
+        int freq = (sample_rate * 2) * (i) / SAMPLE_COUNT;
+        int j = 0;
+        while (loudness_lookup[j+1].freq < freq) {
+            ++j;
+        }
+        float t = float(freq - loudness_lookup[j].freq) / float(loudness_lookup[j+1].freq - loudness_lookup[j].freq);
+        loudness_adjust[i] = float_to_fix15(scale * (t * loudness_lookup[j+1].multiplier + (1.f - t) * loudness_lookup[j].multiplier));
     }
 }
 
