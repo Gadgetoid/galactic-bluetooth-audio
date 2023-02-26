@@ -144,7 +144,6 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 
     display.init();
     display.clear();
-    display.set_pixel(0, 0, 255, 0, 0);
 
     //multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
 
@@ -216,8 +215,6 @@ static void btstack_audio_pico_sink_set_volume(uint8_t volume){
 }
 
 static void btstack_audio_pico_sink_start_stream(void){
-    display.set_pixel(0, 2, 0, 255, 0);
-
     // pre-fill HAL buffers
     btstack_audio_pico_sink_fill_buffers();
 
@@ -233,14 +230,14 @@ static void btstack_audio_pico_sink_start_stream(void){
 }
 
 static void btstack_audio_pico_sink_stop_stream(void){
-    display.set_pixel(0, 2, 0, 0, 0);
-
     audio_i2s_set_enabled(false);
 
     // stop timer
     btstack_run_loop_remove_timer(&driver_timer_sink);
     // state
     btstack_audio_pico_sink_active = false;
+
+    display.clear();
 }
 
 static void btstack_audio_pico_sink_close(void){
