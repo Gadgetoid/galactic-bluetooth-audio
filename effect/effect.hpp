@@ -56,7 +56,7 @@ class ClassicFFT : public Effect {
         uint history_idx;
         uint8_t eq_history[Display::WIDTH][HISTORY_LEN];
 
-        RGB palette[Display::WIDTH];
+        RGB palette[Display::HEIGHT];
 
         float max_sample_from_fft;
         int lower_threshold;
