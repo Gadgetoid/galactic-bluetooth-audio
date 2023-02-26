@@ -36,6 +36,7 @@ target_include_directories(${NAME} PRIVATE
 target_link_libraries(${NAME}
     picow_bt_example_common
     pico_audio_i2s
+    pico_multicore
     display
     rainbow_fft
     classic_fft

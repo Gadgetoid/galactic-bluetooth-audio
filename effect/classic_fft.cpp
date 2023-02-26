@@ -52,9 +52,9 @@ void ClassicFFT::update(int16_t *buffer16, size_t sample_count) {
                     maxy = y;
                 }
             } else if (y < maxy) {
-                r = (uint16_t)(palette[y].r) >> 2;
-                g = (uint16_t)(palette[y].g) >> 2;
-                b = (uint16_t)(palette[y].b) >> 2;
+                r = (uint16_t)(palette[y].r) >> 3;
+                g = (uint16_t)(palette[y].g) >> 3;
+                b = (uint16_t)(palette[y].b) >> 3;
             }
             display.set_pixel(i, height - 1 - y, r, g, b);
         }
