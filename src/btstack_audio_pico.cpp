@@ -68,6 +68,7 @@ Display display;
 FIX_FFT fft;
 RainbowFFT rainbow_fft(display, fft);
 ClassicFFT classic_fft(display, fft);
+CoverArt cover_art(display, fft);
 
 std::vector<Effect *> effects;
 unsigned int current_effect = 0;
@@ -149,6 +150,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 
     effects.push_back(&rainbow_fft);
     effects.push_back(&classic_fft);
+    effects.push_back(&cover_art);
 
     for(auto &effect : effects) {
         effect->init(sample_frequency);
@@ -177,6 +179,10 @@ static void btstack_audio_pico_sink_fill_buffers(void){
 
         if (!gpio_get(Display::SWITCH_B)) {
             current_effect = 1;
+        }
+
+        if (!gpio_get(Display::SWITCH_C)) {
+            current_effect = 2;
         }
 
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
@@ -287,4 +293,8 @@ static const btstack_audio_sink_t btstack_audio_pico_sink = {
 
 const btstack_audio_sink_t * btstack_audio_pico_sink_get_instance(void){
     return &btstack_audio_pico_sink;
+}
+
+void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len){
+    cover_art.set_cover(cover_data, cover_len);
 }

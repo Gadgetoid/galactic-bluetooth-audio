@@ -75,3 +75,15 @@ class ClassicFFT : public Effect {
         void update(int16_t *buffer16, size_t sample_count) override;
         void init(uint32_t sample_frequency) override;
 };
+
+class CoverArt : public Effect {
+    private:
+        const uint8_t * cover_data;
+        uint32_t        cover_len;
+        bool            render;
+    public:
+        CoverArt(Display& display, FIX_FFT &fft) : Effect(display, fft) {}
+        void update(int16_t *buffer16, size_t sample_count) override;
+        void init(uint32_t sample_frequency) override;
+        void set_cover(const uint8_t * data, uint32_t len);
+};
