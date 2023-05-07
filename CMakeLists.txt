@@ -33,6 +33,7 @@ add_executable(${NAME}
 target_include_directories(${NAME} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/effect
+    ${CMAKE_CURRENT_LIST_DIR}/3rd-party/JPEGDEC
 )
 
 target_link_libraries(${NAME}

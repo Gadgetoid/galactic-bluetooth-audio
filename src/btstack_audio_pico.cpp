@@ -62,7 +62,11 @@
 #include "effect.hpp"
 #include "lib/fixed_fft.hpp"
 
+#include "cover_jpg.h"
+#include "3rd-party/JPEGDEC/JPEGDEC.h"
+
 #define DRIVER_POLL_INTERVAL_MS 5
+#define COVER_TIME_MS 3000
 
 Display display;
 FIX_FFT fft;
@@ -72,6 +76,7 @@ CoverArt cover_art(display, fft);
 
 std::vector<Effect *> effects;
 unsigned int current_effect = 0;
+unsigned int previous_effect;
 
 #ifdef EFFECTS_ON_CORE1
 constexpr int core1_stack_len = 512;
@@ -101,6 +106,8 @@ static uint8_t               btstack_volume;
 static uint8_t               btstack_last_sample_idx;
 
 auto_init_mutex(core1_effect_update);
+
+static uint16_t cover_time_counter;
 
 #ifdef EFFECTS_ON_CORE1
 void core1_entry() {
@@ -181,10 +188,6 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             current_effect = 1;
         }
 
-        if (!gpio_get(Display::SWITCH_C)) {
-            current_effect = 2;
-        }
-
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
@@ -220,6 +223,14 @@ static void btstack_audio_pico_sink_fill_buffers(void){
 }
 
 static void driver_timer_handler_sink(btstack_timer_source_t * ts){
+
+    // cover display
+    if (cover_time_counter > 0){
+        cover_time_counter--;
+        if (cover_time_counter == 0){
+            current_effect = previous_effect;
+        }
+    }
 
     // refill
     btstack_audio_pico_sink_fill_buffers();
@@ -296,5 +307,11 @@ const btstack_audio_sink_t * btstack_audio_pico_sink_get_instance(void){
 }
 
 void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len){
+    // cache current effect
+    if (current_effect != 2){
+        previous_effect = current_effect;
+    }
+    current_effect = 2;
+    cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
     cover_art.set_cover(cover_data, cover_len);
 }
