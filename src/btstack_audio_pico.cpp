@@ -315,3 +315,15 @@ void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len){
     cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
     cover_art.set_cover(cover_data, cover_len);
 }
+
+void cover_art_set_title(const char * title){
+    cover_art.set_title(title);
+};
+
+void cover_art_set_artist(const char * artist){
+    cover_art.set_artist(artist);
+};
+
+void cover_art_set_album(const char * album){
+    cover_art.set_album(album);
+};
