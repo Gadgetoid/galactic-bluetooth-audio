@@ -55,3 +55,12 @@ void CoverArt::set_cover(const uint8_t * data, uint32_t len){
     this->render = true;
 };
 
+void CoverArt::set_artist(const char * artist){
+
+}
+void CoverArt::set_album(const char * album){
+
+}
+void CoverArt::set_title(const char * title){
+
+}
