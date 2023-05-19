@@ -181,6 +181,11 @@ void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len);
 #endif
 #endif
 
+#define MAX_NAME_LEN 32
+static char avrcp_artist[MAX_NAME_LEN];
+static char avrcp_album[MAX_NAME_LEN];
+static char avrcp_title[MAX_NAME_LEN];
+
 typedef struct {
     uint8_t  reconfigure;
     uint8_t  num_channels;
@@ -886,9 +891,6 @@ static void avrcp_controller_packet_handler(uint8_t packet_type, uint16_t channe
         case AVRCP_SUBEVENT_NOTIFICATION_TRACK_CHANGED:
             printf("AVRCP Controller: Track changed\n");
 #ifdef COVER_ART_DEMO
-#ifndef HAVE_POSIX_FILE_IO
-            cover_art_set_cover(NULL, 0);
-#endif
             cover_art_trigger_download(avrcp_connection);
 #endif
             break;
@@ -915,6 +917,7 @@ static void avrcp_controller_packet_handler(uint8_t packet_type, uint16_t channe
             if (avrcp_subevent_now_playing_title_info_get_value_len(packet) > 0){
                 memcpy(avrcp_subevent_value, avrcp_subevent_now_playing_title_info_get_value(packet), avrcp_subevent_now_playing_title_info_get_value_len(packet));
                 printf("AVRCP Controller: Title %s\n", avrcp_subevent_value);
+                btstack_strcpy(avrcp_title, sizeof(avrcp_title), (const char *) avrcp_subevent_value);
             }
             break;
 
@@ -922,6 +925,7 @@ static void avrcp_controller_packet_handler(uint8_t packet_type, uint16_t channe
             if (avrcp_subevent_now_playing_artist_info_get_value_len(packet) > 0){
                 memcpy(avrcp_subevent_value, avrcp_subevent_now_playing_artist_info_get_value(packet), avrcp_subevent_now_playing_artist_info_get_value_len(packet));
                 printf("AVRCP Controller: Artist %s\n", avrcp_subevent_value);
+                btstack_strcpy(avrcp_artist, sizeof(avrcp_artist), (const char *) avrcp_subevent_value);
             }
             break;
 
@@ -929,6 +933,7 @@ static void avrcp_controller_packet_handler(uint8_t packet_type, uint16_t channe
             if (avrcp_subevent_now_playing_album_info_get_value_len(packet) > 0){
                 memcpy(avrcp_subevent_value, avrcp_subevent_now_playing_album_info_get_value(packet), avrcp_subevent_now_playing_album_info_get_value_len(packet));
                 printf("AVRCP Controller: Album %s\n", avrcp_subevent_value);
+                btstack_strcpy(avrcp_album, sizeof(avrcp_album), (const char *) avrcp_subevent_value);
             }
             break;
 
@@ -975,6 +980,9 @@ static void avrcp_controller_packet_handler(uint8_t packet_type, uint16_t channe
                 memcpy(a2dp_sink_demo_image_handle, avrcp_subevent_now_playing_cover_art_info_get_value(packet), 7);
                 printf("AVRCP Controller: Cover Art %s\n", a2dp_sink_demo_image_handle);
 #ifdef COVER_ART_DEMO
+#ifndef HAVE_POSIX_FILE_IO
+                cover_art_set_cover(NULL, 0);
+#endif
                 if (a2dp_sink_cover_art_download_active == false){
 #ifdef HAVE_POSIX_FILE_IO
                     a2dp_sink_cover_art_file = fopen(a2dp_sink_demo_thumbnail_path, "w");
