@@ -67,6 +67,8 @@ class Display {
     void clear();
     void update();
     void set_pixel(int x, int y, uint8_t r, uint8_t g, uint8_t b);
+    void draw_char(int x, int y, char c);
+    void draw_string(int x, int y, const char * text);
 
     void set_brightness(float value);
     float get_brightness();
