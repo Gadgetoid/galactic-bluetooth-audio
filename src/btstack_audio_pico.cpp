@@ -66,6 +66,7 @@
 #include "3rd-party/JPEGDEC/JPEGDEC.h"
 
 #define DRIVER_POLL_INTERVAL_MS 5
+#define INFO_TIME_MS  3000
 #define COVER_TIME_MS 3000
 
 Display display;
@@ -108,6 +109,8 @@ static uint8_t               btstack_last_sample_idx;
 auto_init_mutex(core1_effect_update);
 
 static uint16_t cover_time_counter;
+static const uint8_t * cover_data;
+static uint32_t cover_len;
 
 #ifdef EFFECTS_ON_CORE1
 void core1_entry() {
@@ -118,6 +121,16 @@ void core1_entry() {
     }
 }
 #endif
+
+static enum {
+    DISPLAY_IDLE,
+    DISPLAY_INFO,
+    DISPLAY_INFO_DONE,
+    DISPLAY_COVER,
+    DISPLAY_FFT
+} display_mode;
+
+#include <stdio.h>
 
 static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channel_count) {
 
@@ -169,6 +182,8 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 #ifdef EFFECTS_ON_CORE1
     multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
 #endif
+
+    display_mode = DISPLAY_IDLE;
 
     return producer_pool;
 }
@@ -228,7 +243,29 @@ static void driver_timer_handler_sink(btstack_timer_source_t * ts){
     if (cover_time_counter > 0){
         cover_time_counter--;
         if (cover_time_counter == 0){
-            current_effect = previous_effect;
+            switch (display_mode){
+                case DISPLAY_INFO:
+                    // info done
+                    if (cover_data != NULL){
+                        printf("COVER: info done, show cover\n");
+                        display_mode = DISPLAY_COVER;
+                        cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
+                        cover_art.set_cover(cover_data, cover_len);
+                    } else {
+                        printf("COVER: info done, but no cover yet\n");
+                        display_mode = DISPLAY_INFO_DONE;
+                    }
+                    break;
+                case DISPLAY_COVER:
+                    // cover done
+                    printf("COVER: cover done, show fft\n");
+                    display_mode = DISPLAY_FFT;
+                    current_effect = previous_effect;
+                    break;
+                default:
+                    btstack_unreachable();
+                    break;
+            }
         }
     }
 
@@ -306,14 +343,42 @@ const btstack_audio_sink_t * btstack_audio_pico_sink_get_instance(void){
     return &btstack_audio_pico_sink;
 }
 
-void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len){
-    // cache current effect
-    if (current_effect != 2){
-        previous_effect = current_effect;
+void cover_art_set_cover(const uint8_t * data, uint32_t len){
+
+    cover_data = data;
+    cover_len = len;
+
+    switch (display_mode){
+        case DISPLAY_IDLE:
+        case DISPLAY_COVER:
+        case DISPLAY_FFT:
+            // cache active effect
+            btstack_assert(data != NULL);
+            // new song started, show info
+            if (display_mode != DISPLAY_COVER){
+                previous_effect = current_effect;
+                current_effect = 2;
+            }
+            printf("COVER: new song, show info\n");
+            display_mode = DISPLAY_INFO;
+            cover_time_counter = INFO_TIME_MS / DRIVER_POLL_INTERVAL_MS;
+            cover_art.set_cover(NULL, 0);
+            break;
+        case DISPLAY_INFO:
+            // info still shown, cache cover for later
+            printf("COVER: cover ready, but info shown\n");
+            break;
+        case DISPLAY_INFO_DONE:
+            // info fully shown, move on
+            printf("COVER: cover ready after info shown\n");
+            display_mode = DISPLAY_COVER;
+            cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
+            cover_art.set_cover(cover_data, cover_len);
+            break;
+        default:
+            btstack_unreachable();
+            break;
     }
-    current_effect = 2;
-    cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
-    cover_art.set_cover(cover_data, cover_len);
 }
 
 void cover_art_set_title(const char * title){
