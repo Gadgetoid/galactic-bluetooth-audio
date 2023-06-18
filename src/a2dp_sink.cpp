@@ -178,6 +178,7 @@ static FILE * a2dp_sink_cover_art_file;
 #ifdef COVER_ART_DEMO
 static uint8_t cover_art_jpeg[40000];
 void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len);
+void cover_art_set_info(const char * info);
 #endif
 #endif
 
@@ -185,6 +186,7 @@ void cover_art_set_cover(const uint8_t * cover_data, uint32_t cover_len);
 static char avrcp_artist[MAX_NAME_LEN];
 static char avrcp_album[MAX_NAME_LEN];
 static char avrcp_title[MAX_NAME_LEN];
+static char avrcp_info[2 * MAX_NAME_LEN];
 
 typedef struct {
     uint8_t  reconfigure;
@@ -981,7 +983,11 @@ static void avrcp_controller_packet_handler(uint8_t packet_type, uint16_t channe
                 printf("AVRCP Controller: Cover Art %s\n", a2dp_sink_demo_image_handle);
 #ifdef COVER_ART_DEMO
 #ifndef HAVE_POSIX_FILE_IO
-                cover_art_set_cover(NULL, 0);
+                // artist - album
+                btstack_strcpy(avrcp_info, sizeof(avrcp_info), avrcp_artist);
+                btstack_strcat( avrcp_info, sizeof(avrcp_info), " - ");
+                btstack_strcat( avrcp_info, sizeof(avrcp_info), avrcp_title);
+                cover_art_set_info(avrcp_info);
 #endif
                 if (a2dp_sink_cover_art_download_active == false){
 #ifdef HAVE_POSIX_FILE_IO

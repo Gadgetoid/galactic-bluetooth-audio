@@ -1,5 +1,6 @@
 #include "effect.hpp"
 #include "3rd-party/JPEGDEC/JPEGDEC.h"
+#include "btstack_util.h"
 
 // cover art thumbnails are 200x200, main options:
 #if 0
@@ -43,15 +44,20 @@ static int JPEGDraw(JPEGDRAW *pDraw) {
 
 void CoverArt::update(int16_t *buffer16, size_t sample_count) {
     if (this->render){
-        this->render = false;
         display.clear();
         if (this->cover_data != NULL){
+            this->render = false;
             decoder.openRAM((uint8_t *) this->cover_data, this->cover_len, JPEGDraw);
             decoder.setUserPointer(&display);
             decoder.decode(0, 0, SCALING);
             decoder.close();
         } else {
-            display.draw_string(0, 12, "Info");
+            uint16_t scroll_offset = this->cover_art_scroller_offset / 2;
+            display.draw_string(Display::WIDTH - scroll_offset, 12, this->cover_art_info);
+            this->cover_art_scroller_offset++;
+            if (scroll_offset >= ((MAX_TEXT_LEN * 8 * 2) + Display::WIDTH)){
+                this->render = false;
+            }
         }
     }
 }
@@ -65,12 +71,10 @@ void CoverArt::set_cover(const uint8_t * data, uint32_t len){
     this->render = true;
 };
 
-void CoverArt::set_artist(const char * artist){
-
-}
-void CoverArt::set_album(const char * album){
-
-}
-void CoverArt::set_title(const char * title){
-
+void CoverArt::set_info(const char *info) {
+    btstack_strcpy(this->cover_art_info, sizeof(this->cover_art_info), info);
+    printf("Scroller: %s\n", this->cover_art_info);
+    this->cover_data = NULL;
+    this->cover_art_scroller_offset = 0;
+    this->render = true;
 }

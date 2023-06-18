@@ -49,6 +49,7 @@
 #include "btstack_debug.h"
 #include "btstack_audio.h"
 #include "btstack_run_loop.h"
+#include "btstack_util.h"
 
 #include <stddef.h>
 #include <hardware/dma.h>
@@ -66,7 +67,7 @@
 #include "3rd-party/JPEGDEC/JPEGDEC.h"
 
 #define DRIVER_POLL_INTERVAL_MS 5
-#define INFO_TIME_MS  3000
+#define INFO_TIME_MS  5000
 #define COVER_TIME_MS 3000
 
 Display display;
@@ -343,26 +344,21 @@ const btstack_audio_sink_t * btstack_audio_pico_sink_get_instance(void){
     return &btstack_audio_pico_sink;
 }
 
-void cover_art_set_cover(const uint8_t * data, uint32_t len){
+void cover_art_cache_effect(void){
+    // cache active effect
+    if (current_effect != 2){
+        previous_effect = current_effect;
+        current_effect = 2;
+    }
+}
 
+void cover_art_set_cover(const uint8_t * data, uint32_t len){
     cover_data = data;
     cover_len = len;
-
     switch (display_mode){
         case DISPLAY_IDLE:
         case DISPLAY_COVER:
         case DISPLAY_FFT:
-            // cache active effect
-            btstack_assert(data != NULL);
-            // new song started, show info
-            if (display_mode != DISPLAY_COVER){
-                previous_effect = current_effect;
-                current_effect = 2;
-            }
-            printf("COVER: new song, show info\n");
-            display_mode = DISPLAY_INFO;
-            cover_time_counter = INFO_TIME_MS / DRIVER_POLL_INTERVAL_MS;
-            cover_art.set_cover(NULL, 0);
             break;
         case DISPLAY_INFO:
             // info still shown, cache cover for later
@@ -381,14 +377,10 @@ void cover_art_set_cover(const uint8_t * data, uint32_t len){
     }
 }
 
-void cover_art_set_title(const char * title){
-    cover_art.set_title(title);
-};
-
-void cover_art_set_artist(const char * artist){
-    cover_art.set_artist(artist);
-};
-
-void cover_art_set_album(const char * album){
-    cover_art.set_album(album);
-};
+void cover_art_set_info(const char * info){
+    cover_art_cache_effect();
+    printf("COVER: new song, show info\n");
+    cover_art.set_info(info);
+    display_mode = DISPLAY_INFO;
+    cover_time_counter = INFO_TIME_MS / DRIVER_POLL_INTERVAL_MS;
+}
