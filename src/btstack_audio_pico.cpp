@@ -117,7 +117,7 @@ static uint32_t cover_len;
 void core1_entry() {
     while(1) {
         mutex_enter_blocking(&core1_effect_update);
-        effects[0]->update(effect_buf, SAMPLE_COUNT);
+        effects[current_effect]->update(effect_buf, SAMPLE_COUNT);
         mutex_exit(&core1_effect_update);
     }
 }
