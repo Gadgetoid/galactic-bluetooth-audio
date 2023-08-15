@@ -49,6 +49,7 @@
 #include "btstack_debug.h"
 #include "btstack_audio.h"
 #include "btstack_run_loop.h"
+#include "btstack_util.h"
 
 #include <stddef.h>
 #include <hardware/dma.h>
@@ -62,15 +63,22 @@
 #include "effect.hpp"
 #include "lib/fixed_fft.hpp"
 
+#include "cover_jpg.h"
+#include "3rd-party/JPEGDEC/JPEGDEC.h"
+
 #define DRIVER_POLL_INTERVAL_MS 5
+#define INFO_TIME_MS  5000
+#define COVER_TIME_MS 3000
 
 Display display;
 FIX_FFT fft;
 RainbowFFT rainbow_fft(display, fft);
 ClassicFFT classic_fft(display, fft);
+CoverArt cover_art(display, fft);
 
 std::vector<Effect *> effects;
 unsigned int current_effect = 0;
+unsigned int previous_effect;
 
 #ifdef EFFECTS_ON_CORE1
 constexpr int core1_stack_len = 512;
@@ -101,15 +109,29 @@ static uint8_t               btstack_last_sample_idx;
 
 auto_init_mutex(core1_effect_update);
 
+static uint16_t cover_time_counter;
+static const uint8_t * cover_data;
+static uint32_t cover_len;
+
 #ifdef EFFECTS_ON_CORE1
 void core1_entry() {
     while(1) {
         mutex_enter_blocking(&core1_effect_update);
-        effects[0]->update(effect_buf, SAMPLE_COUNT);
+        effects[current_effect]->update(effect_buf, SAMPLE_COUNT);
         mutex_exit(&core1_effect_update);
     }
 }
 #endif
+
+static enum {
+    DISPLAY_IDLE,
+    DISPLAY_INFO,
+    DISPLAY_INFO_DONE,
+    DISPLAY_COVER,
+    DISPLAY_FFT
+} display_mode;
+
+#include <stdio.h>
 
 static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channel_count) {
 
@@ -149,6 +171,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 
     effects.push_back(&rainbow_fft);
     effects.push_back(&classic_fft);
+    effects.push_back(&cover_art);
 
     for(auto &effect : effects) {
         effect->init(sample_frequency);
@@ -160,6 +183,8 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
 #ifdef EFFECTS_ON_CORE1
     multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
 #endif
+
+    display_mode = DISPLAY_IDLE;
 
     return producer_pool;
 }
@@ -214,6 +239,36 @@ static void btstack_audio_pico_sink_fill_buffers(void){
 }
 
 static void driver_timer_handler_sink(btstack_timer_source_t * ts){
+
+    // cover display
+    if (cover_time_counter > 0){
+        cover_time_counter--;
+        if (cover_time_counter == 0){
+            switch (display_mode){
+                case DISPLAY_INFO:
+                    // info done
+                    if (cover_data != NULL){
+                        printf("COVER: info done, show cover\n");
+                        display_mode = DISPLAY_COVER;
+                        cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
+                        cover_art.set_cover(cover_data, cover_len);
+                    } else {
+                        printf("COVER: info done, but no cover yet\n");
+                        display_mode = DISPLAY_INFO_DONE;
+                    }
+                    break;
+                case DISPLAY_COVER:
+                    // cover done
+                    printf("COVER: cover done, show fft\n");
+                    display_mode = DISPLAY_FFT;
+                    current_effect = previous_effect;
+                    break;
+                default:
+                    btstack_unreachable();
+                    break;
+            }
+        }
+    }
 
     // refill
     btstack_audio_pico_sink_fill_buffers();
@@ -287,4 +342,45 @@ static const btstack_audio_sink_t btstack_audio_pico_sink = {
 
 const btstack_audio_sink_t * btstack_audio_pico_sink_get_instance(void){
     return &btstack_audio_pico_sink;
+}
+
+void cover_art_cache_effect(void){
+    // cache active effect
+    if (current_effect != 2){
+        previous_effect = current_effect;
+        current_effect = 2;
+    }
+}
+
+void cover_art_set_cover(const uint8_t * data, uint32_t len){
+    cover_data = data;
+    cover_len = len;
+    switch (display_mode){
+        case DISPLAY_IDLE:
+        case DISPLAY_COVER:
+        case DISPLAY_FFT:
+            break;
+        case DISPLAY_INFO:
+            // info still shown, cache cover for later
+            printf("COVER: cover ready, but info shown\n");
+            break;
+        case DISPLAY_INFO_DONE:
+            // info fully shown, move on
+            printf("COVER: cover ready after info shown\n");
+            display_mode = DISPLAY_COVER;
+            cover_time_counter = COVER_TIME_MS / DRIVER_POLL_INTERVAL_MS;
+            cover_art.set_cover(cover_data, cover_len);
+            break;
+        default:
+            btstack_unreachable();
+            break;
+    }
+}
+
+void cover_art_set_info(const char * info){
+    cover_art_cache_effect();
+    printf("COVER: new song, show info\n");
+    cover_art.set_info(info);
+    display_mode = DISPLAY_INFO;
+    cover_time_counter = INFO_TIME_MS / DRIVER_POLL_INTERVAL_MS;
 }

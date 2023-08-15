@@ -75,3 +75,20 @@ class ClassicFFT : public Effect {
         void update(int16_t *buffer16, size_t sample_count) override;
         void init(uint32_t sample_frequency) override;
 };
+
+#define MAX_TEXT_LEN 32
+class CoverArt : public Effect {
+    private:
+        const uint8_t * cover_data;
+        uint32_t        cover_len;
+        bool            render;
+        char            cover_art_info[2 * MAX_TEXT_LEN];
+        uint16_t        cover_art_scroller_offset = 0;
+
+    public:
+        CoverArt(Display& display, FIX_FFT &fft) : Effect(display, fft) {}
+        void update(int16_t *buffer16, size_t sample_count) override;
+        void init(uint32_t sample_frequency) override;
+        void set_cover(const uint8_t * data, uint32_t len);
+        void set_info(const char * info);
+};

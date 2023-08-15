@@ -14,6 +14,8 @@ pico_sdk_init()
 include(bluetooth/bluetooth.cmake)
 include(effect/rainbow_fft.cmake)
 include(effect/classic_fft.cmake)
+include(effect/cover_art.cmake)
+include(3rd-party/JPEGDEC/JPEGDEC.cmake)
 
 if(DISPLAY_PATH AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
 include(${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
@@ -31,6 +33,7 @@ add_executable(${NAME}
 target_include_directories(${NAME} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/effect
+    ${CMAKE_CURRENT_LIST_DIR}/3rd-party/JPEGDEC
 )
 
 target_link_libraries(${NAME}
@@ -40,6 +43,8 @@ target_link_libraries(${NAME}
     display
     rainbow_fft
     classic_fft
+    cover_art
+    JPEGDEC
 )
 
 message(WARNING "Display: ${DISPLAY_NAME}")

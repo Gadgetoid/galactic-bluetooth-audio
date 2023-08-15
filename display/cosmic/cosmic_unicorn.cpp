@@ -6,7 +6,7 @@
 #include "hardware/adc.h"
 #include "hardware/clocks.h"
 
-
+#include "3rd-party/font/font8x8_basic.h"
 #include "cosmic_unicorn.pio.h"
 
 #include "display.hpp"
@@ -338,4 +338,44 @@ void Display::adjust_brightness(float delta) {
 
 void Display::update() {
   // do something here, probably do the FFT and write the display back buffer?
+}
+
+void Display::draw_char(int x, int y, char c){
+
+  uint8_t * char_data = font8x8_basic[c];
+
+  uint8_t col = 0;
+  if (x < 0){
+    col = -x;
+  }
+
+  while (col < 8) {
+    int pixel_x = x + col;
+    if (pixel_x >= Display::WIDTH) break;
+
+    uint8_t row = 0;
+    if (y < 0){
+      row = -y;
+    }
+
+    while (row < 8){
+      int pixel_y = y + row;
+      if ((char_data[row] & (1 << col)) != 0){
+        set_pixel(pixel_x, pixel_y, 0xff, 0xff, 0xff);
+      }
+      row++;
+    }
+    col++;
+  }
+}
+
+void Display::draw_string(int x, int y, const char * text){
+  while (*text != 0){
+    char c = *text++;
+    if ((x + 8) >= 0) {
+      if (x >= Display::WIDTH) return;
+      draw_char(x, y, c);
+    }
+    x += 8;
+  }
 }
