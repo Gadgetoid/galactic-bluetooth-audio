@@ -58,6 +58,7 @@
 #include "pico/multicore.h"
 #include "pico/sync.h"
 
+#ifndef HEADLESS
 #include "display.hpp"
 #include "effect.hpp"
 #include "lib/fixed_fft.hpp"
@@ -78,9 +79,27 @@ uint32_t core1_stack[512];
 int16_t effect_buf[SAMPLE_COUNT] = {0};
 #endif
 
+#ifdef EFFECTS_ON_CORE1
+auto_init_mutex(core1_effect_update);
+
+void core1_entry() {
+    while(1) {
+        mutex_enter_blocking(&core1_effect_update);
+        effects[0]->update(effect_buf, SAMPLE_COUNT);
+        mutex_exit(&core1_effect_update);
+    }
+}
+#endif
+
+#else
+// If display is disabled, we'll set the sample count to the same as fixed_fft.hpp does anyway.
+constexpr unsigned int SAMPLE_COUNT = 1024u;
+#define DRIVER_POLL_INTERVAL_MS 5
+
+#endif
+
 static constexpr unsigned int BUFFERS_PER_FFT_SAMPLE = 2;
 static constexpr unsigned int SAMPLES_PER_AUDIO_BUFFER = SAMPLE_COUNT / BUFFERS_PER_FFT_SAMPLE;
-
 
 // client
 static void (*playback_callback)(int16_t * buffer, uint16_t num_samples);
@@ -98,18 +117,6 @@ static audio_buffer_pool_t * btstack_audio_pico_audio_buffer_pool;
 static uint8_t               btstack_audio_pico_channel_count;
 static uint8_t               btstack_volume;
 static uint8_t               btstack_last_sample_idx;
-
-auto_init_mutex(core1_effect_update);
-
-#ifdef EFFECTS_ON_CORE1
-void core1_entry() {
-    while(1) {
-        mutex_enter_blocking(&core1_effect_update);
-        effects[0]->update(effect_buf, SAMPLE_COUNT);
-        mutex_exit(&core1_effect_update);
-    }
-}
-#endif
 
 static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channel_count) {
 
@@ -147,6 +154,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     assert(ok);
     (void)ok;
 
+#ifndef HEADLESS
     effects.push_back(&rainbow_fft);
     effects.push_back(&classic_fft);
 
@@ -161,6 +169,8 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
 #endif
 
+#endif
+
     return producer_pool;
 }
 
@@ -171,6 +181,7 @@ static void btstack_audio_pico_sink_fill_buffers(void){
             break;
         }
 
+#ifndef HEADLESS
         if (!gpio_get(Display::SWITCH_A)) {
             current_effect = 0;
         }
@@ -178,10 +189,12 @@ static void btstack_audio_pico_sink_fill_buffers(void){
         if (!gpio_get(Display::SWITCH_B)) {
             current_effect = 1;
         }
+#endif
 
         int16_t * buffer16 = (int16_t *) audio_buffer->buffer->bytes;
         (*playback_callback)(buffer16, audio_buffer->max_sample_count);
 
+#ifndef HEADLESS
 #ifndef EFFECTS_ON_CORE1
         effects[current_effect]->update(buffer16, SAMPLE_COUNT);
 #endif
@@ -189,14 +202,20 @@ static void btstack_audio_pico_sink_fill_buffers(void){
 #ifdef EFFECTS_ON_CORE1
         mutex_enter_blocking(&core1_effect_update);
 #endif
+#endif
+
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
+#ifndef HEADLESS
 #ifdef EFFECTS_ON_CORE1
             effect_buf[i] = buffer16[i];
 #endif
+#endif
             buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
         }
+#ifndef HEADLESS
 #ifdef EFFECTS_ON_CORE1
         mutex_exit(&core1_effect_update);
+#endif
 #endif
 
         // duplicate samples for mono
@@ -267,7 +286,9 @@ static void btstack_audio_pico_sink_stop_stream(void){
     // state
     btstack_audio_pico_sink_active = false;
 
+#ifndef HEADLESS
     display.clear();
+#endif
 }
 
 static void btstack_audio_pico_sink_close(void){

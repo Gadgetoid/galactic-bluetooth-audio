@@ -22,6 +22,9 @@ jobs:
           - name: Galactic Unicorn
             board: galactic
             cmake-args: '-DDISPLAY_PATH=display/galactic/galactic_unicorn.cmake'
+          - name: Headless Unicorn
+            board: none
+            cmake-args: '-DHEADLESS=1'
 
     runs-on: ubuntu-20.04
 

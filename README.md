@@ -39,3 +39,11 @@ mkdir build.cosmic
 cd build.cosmic
 cmake .. -DPICO_SDK_PATH=../../pico-sdk -DPICO_EXTRAS_PATH=../../pico-extras -DPICO_BOARD=pico_w -DDISPLAY_PATH=display/cosmic/cosmic_unicorn.cmake -DCMAKE_BUILD_TYPE=Release
 ```
+
+For Pico Audio, ie. without a display:
+
+```bash
+mkdir build.headless
+cd build.headless
+cmake .. -DPICO_SDK_PATH=../../pico-sdk -DPICO_EXTRAS_PATH=../../pico-extras -DPICO_BOARD=none -DHEADLESS=1 -DCMAKE_BUILD_TYPE=Release
+```
