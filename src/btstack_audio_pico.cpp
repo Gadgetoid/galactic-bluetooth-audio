@@ -112,6 +112,9 @@ void core1_entry() {
 #endif
 
 static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channel_count) {
+#ifdef PICO_AUDIO_I2C_AMP_ENABLE
+    gpio_init(PICO_AUDIO_I2C_AMP_ENABLE); gpio_set_dir(PICO_AUDIO_I2C_AMP_ENABLE, GPIO_OUT); gpio_put(PICO_AUDIO_I2C_AMP_ENABLE, true);
+#endif
 
     // num channels requested by application
     btstack_audio_pico_channel_count = channel_count;

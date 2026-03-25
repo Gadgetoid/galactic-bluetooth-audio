@@ -15,3 +15,10 @@ target_include_directories(display INTERFACE
 target_link_libraries(display INTERFACE pico_stdlib hardware_adc hardware_pio hardware_dma)
 
 set(DISPLAY_NAME "Galactic Unicorn")
+
+target_compile_definitions(${NAME} PRIVATE
+    EFFECTS_ON_CORE1=1
+    PICO_AUDIO_I2S_DATA_PIN=9
+    PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
+    BLUETOOTH_DEVICE_NAME="${DISPLAY_NAME}"
+)

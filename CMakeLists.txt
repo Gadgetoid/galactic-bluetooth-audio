@@ -15,18 +15,18 @@ include(bluetooth/bluetooth.cmake)
 include(effect/rainbow_fft.cmake)
 include(effect/classic_fft.cmake)
 
+add_executable(${NAME}
+    ${CMAKE_CURRENT_LIST_DIR}/src/main.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/a2dp_sink.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/src/btstack_audio_pico.cpp
+)
+
 if(DISPLAY_PATH AND EXISTS ${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
 include(${CMAKE_CURRENT_LIST_DIR}/${DISPLAY_PATH})
 else()
 message(WARNING "Using default display (display/galactic/galactic_unicorn.cmake)...")
 include(display/galactic/galactic_unicorn.cmake)
 endif()
-
-add_executable(${NAME}
-    ${CMAKE_CURRENT_LIST_DIR}/src/main.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/a2dp_sink.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/btstack_audio_pico.cpp
-)
 
 target_include_directories(${NAME} PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
@@ -43,12 +43,6 @@ target_link_libraries(${NAME}
 )
 
 message(WARNING "Display: ${DISPLAY_NAME}")
-
-target_compile_definitions(${NAME} PRIVATE
-    PICO_AUDIO_I2S_DATA_PIN=9
-    PICO_AUDIO_I2S_CLOCK_PIN_BASE=10
-    BLUETOOTH_DEVICE_NAME="${DISPLAY_NAME}"
-)
 
 pico_enable_stdio_usb(${NAME} 1)
 pico_add_extra_outputs(${NAME})
