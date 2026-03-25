@@ -8,12 +8,13 @@
 #include "pico/stdlib.h"
 #include "bluetooth/common.h"
 #include "hardware/vreg.h"
+#include "hardware/clocks.h"
 
 
 int main() {
-    //vreg_set_voltage(VREG_VOLTAGE_1_20);
-    //sleep_ms(10);
-    //set_sys_clock_khz(200000, true);
+    vreg_set_voltage(VREG_VOLTAGE_1_20);
+    sleep_ms(10);
+    set_sys_clock_khz(200000, true);
 
     stdio_init_all();
 
