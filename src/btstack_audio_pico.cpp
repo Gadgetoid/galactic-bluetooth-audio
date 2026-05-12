@@ -30,7 +30,7 @@
  * THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Please inquire about commercial licensing options at 
+ * Please inquire about commercial licensing options at
  * contact@bluekitchen-gmbh.com
  *
  */
@@ -102,10 +102,13 @@ static uint8_t               btstack_last_sample_idx;
 auto_init_mutex(core1_effect_update);
 
 #ifdef EFFECTS_ON_CORE1
+static semaphore_t effect_buf_ready;
+
 void core1_entry() {
     while(1) {
+        sem_acquire_blocking(&effect_buf_ready);
         mutex_enter_blocking(&core1_effect_update);
-        effects[0]->update(effect_buf, SAMPLE_COUNT);
+        effects[current_effect]->update(effect_buf, SAMPLE_COUNT);
         mutex_exit(&core1_effect_update);
     }
 }
@@ -161,6 +164,7 @@ static audio_buffer_pool_t *init_audio(uint32_t sample_frequency, uint8_t channe
     display.clear();
 
 #ifdef EFFECTS_ON_CORE1
+    sem_init(&effect_buf_ready, 0, 1);
     multicore_launch_core1_with_stack(core1_entry, core1_stack, core1_stack_len);
 #endif
 
@@ -190,17 +194,20 @@ static void btstack_audio_pico_sink_fill_buffers(void){
 #endif
 
 #ifdef EFFECTS_ON_CORE1
-        mutex_enter_blocking(&core1_effect_update);
+        // Try to hand a fresh buffer to core1 without ever blocking the audio path.
+        // If core1 is still processing the previous frame, just skip this visual update.
+        bool got_effect_lock = mutex_try_enter(&core1_effect_update, NULL);
+        if (got_effect_lock) {
+            for (auto i = 0u; i < SAMPLE_COUNT; i++) {
+                effect_buf[i] = buffer16[i];
+            }
+            mutex_exit(&core1_effect_update);
+            sem_release(&effect_buf_ready);
+        }
 #endif
         for (auto i = 0u; i < SAMPLE_COUNT; i++) {
-#ifdef EFFECTS_ON_CORE1
-            effect_buf[i] = buffer16[i];
-#endif
-            buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 8;
+            buffer16[i] = (int32_t(buffer16[i]) * int32_t(btstack_volume)) >> 7;
         }
-#ifdef EFFECTS_ON_CORE1
-        mutex_exit(&core1_effect_update);
-#endif
 
         // duplicate samples for mono
         if (btstack_audio_pico_channel_count == 1){
@@ -228,7 +235,7 @@ static void driver_timer_handler_sink(btstack_timer_source_t * ts){
 
 static int btstack_audio_pico_sink_init(
     uint8_t channels,
-    uint32_t samplerate, 
+    uint32_t samplerate,
     void (*playback)(int16_t * buffer, uint16_t num_samples)
 ){
     btstack_assert(playback != NULL);
